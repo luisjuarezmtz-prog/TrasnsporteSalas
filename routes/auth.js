@@ -31,7 +31,10 @@ router.post('/login', (req, res) => {
 
   const query = 'SELECT * FROM users U inner join dw_employees de on U.ID_DW_EMPLOYEE= de.ID_DW_EMPLOYEE WHERE USERNAME = ?';
   db.execute(query, [username], async (err, results) => {
-    if (err) return res.status(500).json({ message: 'Error en el servidor' });
+    if (err) {
+      console.error('Error de consulta en /api/login:', err.code, err.message);
+      return res.status(500).json({ message: 'Error en el servidor' });
+    }
     if (results.length === 0) return res.status(401).json({ message: 'Credenciales incorrectas' });
 
     const user = results[0];
