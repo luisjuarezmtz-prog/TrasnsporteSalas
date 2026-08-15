@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Viajes - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/consultarviajes.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+    <div class="container">
+        <a href="dashboard.html" class="btn-regresar">⬅ Volver al Menú</a>
+        
+        <h2>Gestión de Viajes Capturados</h2>
+
+        <div class="search-container">
+           
+            <div style="display: flex; flex-direction: column;">
+                <label><strong>🔍 Buscador rápido:</strong></label>
+                <input type="text" id="inputBusqueda" class="search-input" style="width: 200px;"
+                        placeholder="Orden, Factura o Empleado..." onkeyup="filtrarTabla()">
+            </div>
+            
+            <div style="display: flex; flex-direction: column;">
+                <label for="filtroEstatusBD"><strong>Estatus:</strong></label>
+                <select id="filtroEstatusBD" class="search-input filter-select" onchange="cargarRegistros()">
+                    <option value="TODOS">-- MOSTRAR TODOS --</option>
+                </select>
+            </div>
+
+            <div style="display: flex; flex-direction: column;">
+                <label><strong>Entrega desde:</strong></label>
+                <input type="date" id="fechaInicio" class="search-input" onchange="cargarRegistros()">
+            </div>
+            
+            <div style="display: flex; flex-direction: column;">
+                <label><strong>Hasta:</strong></label>
+                <input type="date" id="fechaFin" class="search-input" onchange="cargarRegistros()">
+            </div>
+
+            <div style="display: flex; flex-direction: column;">
+                <label><strong>Pago desde:</strong></label>
+                <input type="date" id="pagoInicio" class="search-input" onchange="cargarRegistros()">
+            </div>
+            
+            <div style="display: flex; flex-direction: column;">
+                <label><strong>Hasta:</strong></label>
+                <input type="date" id="pagoFin" class="search-input" onchange="cargarRegistros()">
+            </div>
+
+            <button class="btn-clear" onclick="limpiarFiltros()" style="margin-top: 15px;">Limpiar Filtros</button>
+            
+            <button class="btn-excel" onclick="exportarExcel()" style="margin-top: 15px;">
+                📊 Descargar Excel
+            </button>
+            <div style="display: flex; flex-direction: column;">
+                <label>El total de registros son: <strong id="totalcount"></strong></label>
+                <label>El total de cancelados son: <strong id="totalcountCancel"></strong></label>
+            </div>
+            <label>El total de ingreso es: <strong id="sumganancia"></strong></label>
+            <label>El total de gastos es: <strong id="sumgasto"></strong></label>
+        </div>
+        
+        <div class="table-wrapper">
+            <table id="tablaViajes">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Orden</th>
+                        <th>Físico</th> <th>Factura</th> 
+                        <th>F. Orden</th>
+                        <th>F. Entrega</th>
+                        <th>Hora</th>
+                        <th>F. Pago</th>
+                        <th>CEDIS</th>
+                        <th>Tipo</th>
+                        <th>Empleado</th>
+                        <th>Estatus</th>
+                        <th>Monto</th>
+                        <th>Gastos</th>
+                        <th>Totopos</th>
+                        <th>Tostadas</th>
+                        <th>Total</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaCuerpo"></tbody>
+            </table>
+        </div>
+    </div>
+
+   <script>
+        // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
+        let listaEmpleados = [];
+        let listaEstatus = [];
+
+        async function obtenerCatalogos() {
+            try {
+                const [resEmp, resEst] = await Promise.all([
+                    fetch('/api/empleados'),
+                    fetch('/api/estatus')
+                ]);
+                if (resEmp.ok) listaEmpleados = await resEmp.json();
+                if (resEst.ok) {
+                    listaEstatus = await resEst.json();
+                    llenarSelectorFiltro();
+                }
+            } catch (e) { console.error("Error catálogos:", e); }
+        }
+
+        function llenarSelectorFiltro() {
+            const select = document.getElementById('filtroEstatusBD');
+            select.innerHTML = '<option value="TODOS">-- MOSTRAR TODOS --</option>';
+            listaEstatus.forEach(est => {
+                const opt = document.createElement('option');
+                opt.value = est.STATUS_NAME; // asignación vía propiedad DOM, no requiere escapeHtml
+                opt.textContent = est.STATUS_NAME;
+                select.appendChild(opt);
+            });
+        }
+
+        const formatearMoneda = (v) => {
+            return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v || 0);
+        };
+
+        const formatoInputFecha = (fechaStr) => {
+            if (!fechaStr || fechaStr === "null") return "";
+            const d = new Date(fechaStr);
+            if (isNaN(d.getTime())) return "";
+            d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+            return d.toISOString().split('T')[0];
+        };
+
+        const formatoVistaFecha = (fechaStr) => {
+            if (!fechaStr || fechaStr === "null") return "---";
+            const d = new Date(fechaStr);
+            if (isNaN(d.getTime())) return "---";
+            const dia = String(d.getDate()).padStart(2, '0');
+            const mes = String(d.getMonth() + 1).padStart(2, '0');
+            const anio = d.getFullYear();
+            return `${dia}/${mes}/${anio}`;
+        };
+
+        function actualizarEstatusFila(id, nuevoEstatus) {
+            const fila = document.getElementById(`fila-${id}`);
+            if (!fila) return;
+            const selectEstatus = fila.querySelector('select[data-key="estatus"]');
+            if (selectEstatus) {
+                const opcionExiste = Array.from(selectEstatus.options).some(opt => opt.value === nuevoEstatus);
+                if (opcionExiste) {
+                    selectEstatus.value = nuevoEstatus;
+                } else {
+                    console.warn(`El estatus "${nuevoEstatus}" no está disponible en el catálogo.`);
+                }
+            }
+        }
+
+        // NUEVA FUNCIÓN: Actualiza el campo FISICO directamente en la Base de Datos al hacer clic
+        async function actualizarFisicoDirecto(id, isChecked) {
+            const valorFisico = isChecked ? 1 : 0;
+            const usuario = localStorage.getItem('usuario_salas') || 'Sistema';
+
+            try {
+                // Se envía un objeto parcial únicamente con el campo FISICO
+                const res = await fetch(`/api/actualizar-viaje-Check/${id}`, {
+                    method: 'PUT', // Cambia a 'PATCH' si tu backend lo requiere de esa forma
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        fisico: valorFisico                       
+                    })
+                });
+
+                if (!res.ok) {
+                    const result = await res.json();
+                    showAlert("No se pudo actualizar el estado físico: " + result.message, "error");
+                    // Revertir el checkbox visualmente si falló el servidor
+                    document.getElementById(`chk-fisico-${id}`).checked = !isChecked;
+                }
+            } catch (e) {
+                showAlert("Error de conexión al actualizar estado físico", "error");
+                document.getElementById(`chk-fisico-${id}`).checked = !isChecked;
+            }
+        }
+
+        async function cargarRegistros() {
+            try {
+                if (listaEmpleados.length === 0) await obtenerCatalogos();
+
+                const estatus = document.getElementById('filtroEstatusBD').value;
+                const fIni = document.getElementById('fechaInicio').value;
+                const fFin = document.getElementById('fechaFin').value;
+                const pIni = document.getElementById('pagoInicio').value;
+                const pFin = document.getElementById('pagoFin').value;
+
+                let count = 0;
+                let countCancel = 0;
+                let sumgastos = 0;
+                let sumganancias = 0;
+                
+                let url = `/api/consultar-viajes?estatus=${encodeURIComponent(estatus)}`;
+                if (fIni && fFin) url += `&fechaInicio=${fIni}&fechaFin=${fFin}`;
+                if (pIni && pFin) url += `&pagoInicio=${pIni}&pagoFin=${pFin}`;
+
+                const response = await fetch(url);
+                const datos = await response.json();
+                const tabla = document.getElementById('tablaCuerpo');
+                tabla.innerHTML = '';
+
+                datos.forEach(viaje => {
+                    count++;
+                    
+                    if (viaje.ESTATUS.toUpperCase() === 'CANCELADO') {
+                        countCancel++;
+                    } else {
+                        sumganancias += viaje.MONTO_VIAJE;
+                        sumgastos += viaje.MONTO_GASTOS;
+                    }
+
+                    const id = viaje.ID_PURCHASE_ORDER;
+                    const fila = document.createElement('tr');
+                    fila.id = `fila-${id}`;
+
+                    let opcionesEmp = `<option value="">Sin asignar</option>`;
+                    listaEmpleados.forEach(e => {
+                        const nombreEmpleado = e.NAME || '';
+                        const sel = (nombreEmpleado.split(' ')[0] === viaje.EMPLEADO) ? 'selected' : '';
+                        opcionesEmp += `<option value="${escapeHtml(nombreEmpleado)}" ${sel}>${escapeHtml(nombreEmpleado)}</option>`;
+                    });
+
+                    let opcionesEst = "";
+                    listaEstatus.forEach(st => {
+                        const sel = (st.STATUS_NAME === viaje.ESTATUS) ? 'selected' : '';
+                        opcionesEst += `<option value="${escapeHtml(st.STATUS_NAME)}" ${sel}>${escapeHtml(st.STATUS_NAME)}</option>`;
+                    });
+                    const claseCancelado = (viaje.ESTATUS && viaje.ESTATUS.toUpperCase() === 'CANCELADO') ? 'cancelado' : '';
+                    
+                    // Condición para evaluar el checkbox de físico
+                    const checkState = parseInt(viaje.FISICO) === 1 ? 'checked' : '';
+
+                    fila.innerHTML = `
+                        <td><strong>${escapeHtml(id)}</strong></td>
+                        <td><span class="view">${escapeHtml(viaje.ORDEN_COMPRA || 'S/N')}</span><input type="text" class="edit edit-mode" data-key="purchase_order" value="${escapeHtml(viaje.ORDEN_COMPRA || '')}" style="display:none"></td>
+
+                        <td style="text-align: center;">
+                            <input type="checkbox" id="chk-fisico-${id}" class="check-fisico" ${checkState} onchange="actualizarFisicoDirecto(${id}, this.checked)">
+                        </td>
+
+                        <td>
+                            <span class="view">${escapeHtml(viaje.FOLIO_FACTURA || '---')}</span>
+                            <input type="text" class="edit edit-mode" data-key="invoice_inter" value="${escapeHtml(viaje.FOLIO_FACTURA || '')}" style="display:none" oninput="if(this.value.trim().length >= 1) actualizarEstatusFila(${id}, 'FINALIZADO')">
+                        </td>
+                        <td><span class="view">${formatoVistaFecha(viaje.FECHA_ORDEN)}</span><input type="date" class="edit edit-mode" data-key="order_date" value="${formatoInputFecha(viaje.FECHA_ORDEN)}" style="display:none"></td>
+                        <td><span class="view">${formatoVistaFecha(viaje.FECHA_ENTREGA)}</span><input type="date" class="edit edit-mode" data-key="delivery_date" value="${formatoInputFecha(viaje.FECHA_ENTREGA)}" style="display:none"></td>
+                        <td><span class="view">${escapeHtml(viaje.DELIVERY_TIME || '--:--')}</span><input type="time" class="edit edit-mode" data-key="delivery_time" value="${escapeHtml(viaje.DELIVERY_TIME || '')}" style="display:none"></td>
+                        <td><span class="view">${formatoVistaFecha(viaje.FECHA_PAGO)}</span><input type="date" class="edit edit-mode" data-key="payment_date" value="${formatoInputFecha(viaje.FECHA_PAGO)}" style="display:none"></td>
+                        <td>${escapeHtml(viaje.CEDIS || 'Sin CEDIS')}</td>
+                        <td>${escapeHtml(viaje.TIPO_VIAJE || '---')}</td>
+                        <td>
+                            <span class="view emp-text">${escapeHtml(viaje.EMPLEADO || 'Sin registro')}</span>
+                            <select class="edit edit-mode" data-key="empleado" style="display:none" onchange="if(this.value !== '') actualizarEstatusFila(${id}, 'ASIGNADO')">${opcionesEmp}</select>
+                        </td>
+                        <td>
+                            <span class="view">
+                                <span class="status-pill ${claseCancelado}">${escapeHtml(viaje.ESTATUS || 'PENDIENTE')}</span>
+                            </span>
+                            <select class="edit edit-mode" data-key="estatus" style="display:none">${opcionesEst}</select>
+                        </td>
+                        <td class="monto">${formatearMoneda(viaje.MONTO_VIAJE)}</td>
+                        <td class="monto">${formatearMoneda(viaje.MONTO_GASTOS)}</td>
+                        <td><span class="view">${escapeHtml(viaje.NUM_TOTOPOS || 0)}</span><input type="number" class="edit edit-mode" data-key="num_totopos" value="${escapeHtml(viaje.NUM_TOTOPOS || 0)}" style="display:none"></td>
+                        <td><span class="view">${escapeHtml(viaje.NUM_TOSTADAS || 0)}</span><input type="number" class="edit edit-mode" data-key="num_tostadas" value="${escapeHtml(viaje.NUM_TOSTADAS || 0)}" style="display:none"></td>
+                        <td><span class="badge">${escapeHtml(viaje.TOTAL_TARIMAS || 0)}</span></td>
+                        <td>
+                            <button class="btn-edit" id="btn-edit-${id}" onclick="habilitarEdicion(${id})">✏️</button>
+                            <button class="btn-save" id="btn-save-${id}" onclick="guardarCambios(${id})">💾</button>
+                            <button class="btn-cancel" id="btn-cancel-${id}" onclick="cargarRegistros()">❌</button>
+                        </td>
+                    `;
+                    tabla.appendChild(fila);
+                });
+                
+                document.getElementById('totalcount').textContent = count;
+                document.getElementById('totalcountCancel').textContent = countCancel;
+                document.getElementById('sumganancia').textContent = formatearMoneda(sumganancias);
+                document.getElementById('sumgasto').textContent = formatearMoneda(sumgastos);
+            } catch (e) { console.error("Error tabla:", e); }
+        }
+
+        function habilitarEdicion(id) {
+            const fila = document.getElementById(`fila-${id}`);
+            fila.querySelectorAll('.view').forEach(el => el.style.display = 'none');
+            fila.querySelectorAll('.edit').forEach(el => el.style.display = 'inline-block');
+            document.getElementById(`btn-edit-${id}`).style.display = 'none';
+            document.getElementById(`btn-save-${id}`).style.display = 'inline-block';
+            document.getElementById(`btn-cancel-${id}`).style.display = 'inline-block';
+        }
+
+        async function guardarCambios(id) {
+            const fila = document.getElementById(`fila-${id}`);
+            const inputs = fila.querySelectorAll('.edit');
+            const data = {};
+            inputs.forEach(i => { data[i.getAttribute('data-key')] = i.value; });
+            
+            // También adjuntamos el valor actual del checkbox en el guardado manual si es necesario
+            data.fisico = document.getElementById(`chk-fisico-${id}`).checked ? 1 : 0;
+            data.usuario_logeado = localStorage.getItem('usuario_salas') || 'Sistema';
+
+            try {
+                const res = await fetch(`/api/actualizar-viaje/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                
+                if (res.ok) {
+                    cargarRegistros();
+                } else {
+                    showAlert("Error: " + result.message, "error");
+                }
+            } catch (e) { showAlert("Error de conexión", "error"); }
+        }
+
+        function limpiarFiltros() {
+            ['fechaInicio','fechaFin','pagoInicio','pagoFin','inputBusqueda'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('filtroEstatusBD').value = 'TODOS';
+            cargarRegistros();
+        }
+
+        function filtrarTabla() {
+            const filtro = document.getElementById("inputBusqueda").value.toUpperCase();
+            const filas = document.querySelectorAll("#tablaCuerpo tr");
+            filas.forEach(f => {
+                const txt = f.textContent.toUpperCase();
+                f.style.display = txt.includes(filtro) ? "" : "none";
+            });
+        }
+
+        function exportarExcel() {
+            const f1 = document.getElementById('fechaInicio').value;
+            const f2 = document.getElementById('fechaFin').value;
+            const p1 = document.getElementById('pagoInicio').value;
+            const p2 = document.getElementById('pagoFin').value;
+            if(f1==='')
+                window.location.href = `/api/exportar-excel-pago?fechaInicio=${p1}&fechaFin=${p2}`;
+            else
+                window.location.href = `/api/exportar-excel?fechaInicio=${f1}&fechaFin=${f2}`;
+        }
+
+        window.onload = cargarRegistros;
+    </script>
+</body>
+</html>

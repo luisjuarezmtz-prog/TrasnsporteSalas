@@ -1,0 +1,25 @@
+{
+  "name": "node_app",
+  "version": "1.0.0",
+  "description": "Sistema interno de Transportes Salas (viajes, nomina, prestamos, tarimas, check de caja seca).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "mysql2": "^3.20.0",
+    "nodemailer": "^8.0.9"
+  }
+}

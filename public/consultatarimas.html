@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Tarimas - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/consultatarimas.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h2>📜 Historial de Registros de Tarimas</h2>
+
+    <div class="search-box">
+        <select id="selectCedi">
+            <option value="TODOS">-- Todos los CEDIS --</option>
+        </select>
+
+        <input type="text" id="inputFolio" placeholder="Folio Factura (Opcional)">
+
+        <button class="btn-search" onclick="consultarHistorial()">🔍 Consultar</button>
+        <button class="btn-excel" onclick="descargarExcel()">📊 Descargar Excel</button>
+        <button class="btn-home" onclick="window.location.href='dashboard.html'">🏠 Inicio</button>
+    </div>
+
+    <div class="table-container">
+        <table id="tablaHistorial">
+            <thead>
+                <tr>
+                    <th>Folio Factura</th>
+                    <th>CEDIS</th>
+                    <th>Empleado</th>
+                    <th>F. Entrega</th>
+                    <th>Tarimas</th>
+                    <th>Vales</th>
+                    <th>Usuario Modificó</th>
+                    <th>Fecha Cambio</th>
+                </tr>
+            </thead>
+            <tbody id="tbodyHistorial"></tbody>
+        </table>
+        <div id="emptyMsg" class="no-data">Use los filtros para buscar registros.</div>
+    </div>
+</div>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    // 1. Cargar el catálogo de CEDIS al abrir la página
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const response = await fetch('/api/cedis');
+            const cedis = await response.json();
+            const select = document.getElementById('selectCedi');
+            
+            cedis.forEach(c => {
+                const option = document.createElement('option');
+                option.value = c.ID_CEDI;
+                option.textContent = c.CEDI_NAME;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error("Error al cargar el catálogo de CEDIS:", error);
+        }
+    });
+
+    // 2. Función de consulta con filtros combinados
+    async function consultarHistorial() {
+        const folio = document.getElementById('inputFolio').value.trim();
+        const cediId = document.getElementById('selectCedi').value;
+        const tbody = document.getElementById('tbodyHistorial');
+        const msg = document.getElementById('emptyMsg');
+
+        // Construir la URL con ambos parámetros
+        const url = `/api/historial-pallets?folio=${encodeURIComponent(folio)}&cediId=${cediId}`;
+
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+
+            tbody.innerHTML = "";
+            
+            if (data.length > 0) {
+                msg.style.display = 'none';
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${escapeHtml(row.FOLIO_FACTURA)}</strong></td>
+                        <td>${escapeHtml(row.CEDI || 'N/A')}</td>
+                        <td>${escapeHtml(row.NOMBRE)}</td>
+                        <td>${escapeHtml(row.FECHA_ENTREGA)}</td>
+                        <td>${escapeHtml(row.NUM_TARIMAS)}</td>
+                        <td>${escapeHtml(row.NUM_VALE)}</td>
+                        <td>${escapeHtml(row.USUARIO)}</td>
+                        <td>${escapeHtml(row.FECHA)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                msg.style.display = 'block';
+                msg.textContent = "❌ No se encontraron resultados con los filtros aplicados.";
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            showAlert("Error al obtener el historial.", "error");
+        }
+    }
+
+    // 3. Función de descarga de Excel con filtros
+    function descargarExcel() {
+        const folio = document.getElementById('inputFolio').value.trim();
+        const cediId = document.getElementById('selectCedi').value;
+
+        // Se envía a la nueva ruta de exportación que creamos en el servidor
+        window.location.href = `/api/exportar-historial-pallets?folio=${encodeURIComponent(folio)}&cediId=${cediId}`;
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script src="js/theme.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check de Caja Seca para Tráiler</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="brand">
+  <h1>Check de Caja Seca — Tráiler</h1>
+  <span class="tag">FORM-CCS-01</span>
+</div>
+
+<!-- ── Panel de búsqueda / edición ─────────────────────────── -->
+<div class="panel" data-collapsible="false" id="panelEditar">
+  <h2>Buscar / cargar check guardado</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:10px;align-items:end;">
+    <div class="field"><label>ID del check</label><input type="text" id="editId" placeholder="ej. 12"></div>
+    <div class="field">
+      <label>Buscar por placa / NIV·Serie / folio tarjeta</label>
+      <input type="text" id="busqueda" placeholder="Escribe y presiona Enter o el botón">
+    </div>
+    <button type="button" id="btnBuscar">Buscar</button>
+    <button type="button" id="btnCargar">Cargar ID</button>
+    <button type="button" class="ghost" id="btnNuevo" style="grid-column:4;">Nuevo check</button>
+  </div>
+
+  <!-- Resultados de búsqueda -->
+  <div id="resultadosBusqueda" style="display:none;margin-top:12px;">
+    <table id="tablaBusqueda">
+      <thead><tr>
+        <th>ID</th><th>Fecha</th><th>Placa</th><th>NIV / Serie</th>
+        <th>No. Tarjeta</th><th>Inspector</th><th>Dictamen</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <p class="hint" id="estadoEdicion">Modo: nuevo check (se creará un registro nuevo al guardar).</p>
+</div>
+
+<!-- ── Datos generales (encabezado del check) ───────────────── -->
+<div class="panel" id="panelDatosGenerales">
+  <h2>Datos generales</h2>
+
+  <!-- Fila 1: Identificación del check -->
+  <div class="grid grid-4" style="margin-bottom:12px;">
+    <div class="field"><label>Fecha</label><input type="date" id="fecha"></div>
+    <div class="field"><label>Hora</label><input type="time" id="hora"></div>
+    <div class="field"><label>No. económico / unidad</label><input type="text" id="noEconomico"></div>
+    <div class="field"><label>Inspector</label><input type="text" id="inspector"></div>
+  </div>
+
+  <!-- Fila 2: Identificación del vehículo (NIV/Serie es el único campo de número de serie) -->
+  <div class="grid grid-4" style="margin-bottom:12px;">
+    <div class="field"><label>Placa</label><input type="text" id="placa"></div>
+    <div class="field"><label>NIV / Serie (VIN)</label><input type="text" id="nivSerie"></div>
+    <div class="field"><label>Modalidad</label><input type="text" id="modalidad"></div>
+    <div class="field"><label>Motor</label><input type="text" id="motor"></div>
+  </div>
+
+  <!-- Fila 3: Caja (Marca de Caja es el combo que sustituye al campo libre Marca) -->
+  <div class="grid grid-4" style="margin-bottom:12px;">
+    <div class="field"><label>Marca de Caja</label>
+      <select id="marcaCaja">
+        <option value="">Seleccione marca...</option>
+        <option>UTILITY</option><option>WABASH</option><option>GREAT DANE</option>
+        <option>STOUGHTON</option><option>HYUNDAI</option><option>OTRA</option>
+      </select>
+    </div>
+    <div class="field"><label>Modelo (Año)</label><input type="text" id="modelo"></div>
+    <div class="field"><label>Clase</label><input type="text" id="clase"></div>
+    <div class="field"><label>Combustible</label><input type="text" id="combustible"></div>
+  </div>
+
+  <!-- Fila 4: Tipo de caja y transmisión -->
+  <div class="grid grid-4" style="margin-bottom:12px;">
+    <div class="field"><label>Tipo de caja</label>
+      <select id="tipoCaja">
+        <option value="SECA">SECA</option>
+        <option value="REFRIGERADA">REFRIGERADA</option>
+        <option value="OTRA">OTRA</option>
+      </select>
+    </div>
+    <div class="field"><label>Tipo de Caja (transmisión)</label>
+      <select id="tipoCajaTransmision">
+        <option value="">Seleccione tipo...</option>
+        <option>AUTOMÁTICA</option><option>MECÁNICA</option><option>AUTOMATIZADA</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Fila 5: Cliente -->
+  <div class="field"><label>Cliente / Empresa</label><input type="text" id="clienteEmpresa"></div>
+</div>
+
+<!-- ── Datos Fiscales y Propietario ─────────────────────────── -->
+<div class="panel">
+  <h2>Datos Fiscales y Propietario</h2>
+  <div class="grid grid-3" style="margin-bottom:12px;">
+    <div class="field" style="grid-column:1/3;"><label>Razón Social</label><input type="text" id="razonSocial"></div>
+    <div class="field"><label>RFC (Reg. Federal)</label><input type="text" id="rfc"></div>
+    <div class="field" style="grid-column:1/-1;"><label>Propietario Vehículo</label><input type="text" id="propietarioVehiculo"></div>
+  </div>
+  <div class="grid grid-4" style="margin-bottom:12px;">
+    <div class="field"><label>Calle</label><input type="text" id="dCalle"></div>
+    <div class="field"><label>Número</label><input type="text" id="dNumero"></div>
+    <div class="field"><label>Colonia</label><input type="text" id="dColonia"></div>
+    <div class="field"><label>C.P.</label><input type="text" id="dCp"></div>
+  </div>
+  <div class="field"><label>Domicilio Fiscal</label><input type="text" id="domicilioFiscal"></div>
+</div>
+
+<!-- ── Capacidades y Dimensiones ───────────────────────────── -->
+<div class="panel">
+  <h2>Capacidades y Dimensiones</h2>
+  <div class="grid" style="grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:12px;">
+    <div class="field"><label>Peso Vehicular</label><input type="text" id="pesoVehicular"></div>
+    <div class="field"><label>Ejes</label><input type="text" id="numEjes"></div>
+    <div class="field"><label>Llantas</label><input type="text" id="numLlantas"></div>
+    <div class="field"><label>Litros</label><input type="text" id="litros"></div>
+    <div class="field"><label>Toneladas</label><input type="text" id="toneladas"></div>
+    <div class="field"><label>Personas</label><input type="text" id="personas"></div>
+  </div>
+  <div class="grid grid-4">
+    <div class="field"><label>Alto (m)</label><input type="text" id="altoM"></div>
+    <div class="field"><label>Ancho (m)</label><input type="text" id="anchoM"></div>
+    <div class="field"><label>Largo (m)</label><input type="text" id="largoM"></div>
+    <div class="field"><label>Tipo Suspensión</label><input type="text" id="tipoSuspension"></div>
+  </div>
+</div>
+
+<!-- ── Ejes y Trámite ───────────────────────────────────────── -->
+<div class="panel">
+  <h2>Ejes y Trámite</h2>
+  <div class="grid grid-4" style="margin-bottom:12px;">
+    <div class="field"><label>Eje Direccional</label><input type="text" id="ejeDireccional"></div>
+    <div class="field"><label>Eje Motriz</label><input type="text" id="ejeMotriz"></div>
+    <div class="field"><label>Eje Arrastre</label><input type="text" id="ejeArrastre"></div>
+    <div class="field"><label>Permiso Ruta</label><input type="text" id="permisoRuta"></div>
+  </div>
+  <div class="grid grid-4" style="margin-bottom:12px;">
+    <div class="field"><label>Folio</label><input type="text" id="folioTramite"></div>
+    <div class="field"><label>Folio Serie (No. Tarjeta Circ.)</label><input type="text" id="folioSerie"></div>
+    <div class="field"><label>Fecha Límite Suspensión</label><input type="date" id="fechaLimiteSuspension"></div>
+    <div class="field"><label>Trámite</label><input type="text" id="tramite"></div>
+  </div>
+  <div class="grid grid-4">
+    <div class="field"><label>Lugar Expedición</label><input type="text" id="lugarExpedicion"></div>
+    <div class="field"><label>Fecha Expedición</label><input type="date" id="fechaExpedicion"></div>
+  </div>
+</div>
+
+<!-- ── Documentación Digital ────────────────────────────────── -->
+<div class="panel">
+  <h2>Documentación Digital</h2>
+  <div class="doc-upload-box">
+    <p class="doc-label">Subir Tarjeta de Circulación (PDF o Imagen)</p>
+    <label class="upload-btn" for="archivoTarjeta">
+      <span id="uploadBtnText">Seleccionar archivo</span>
+      <input type="file" id="archivoTarjeta" accept=".pdf,.jpg,.jpeg,.png" style="display:none;">
+    </label>
+    <span id="archivoNombre" class="archivo-nombre">Sin archivo seleccionado</span>
+    <p class="hint">Formatos permitidos: PDF, JPG, PNG. Máximo 10 MB.</p>
+    <div id="archivoActual" style="display:none;" class="archivo-actual">
+      <span id="archivoActualNombre"></span>
+      <a id="archivoActualLink" href="#" target="_blank" class="link-ver">Ver documento actual</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── Diagramas dinámicos ──────────────────────────────────── -->
+<div class="panel">
+  <h2>Diagramas del tráiler — clic sobre la imagen para marcar un daño</h2>
+  <p class="hint">Selecciona el tipo de daño y describe lo observado. Cada marca queda georreferenciada sobre el dibujo.</p>
+  <div class="views" id="viewsContainer">
+    <div class="view-card">
+      <h3>Vista lateral izquierda</h3>
+      <div class="view-wrap" data-vista="LATERAL_IZQUIERDA">
+        <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+          <rect x="30" y="30" width="500" height="100" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <line x1="30" y1="50" x2="530" y2="50" stroke="#3a444f" stroke-width="1"/>
+          <line x1="30" y1="110" x2="530" y2="110" stroke="#3a444f" stroke-width="1"/>
+          <rect x="50" y="40" width="40" height="20" fill="none" stroke="#3a444f"/>
+          <circle cx="150" cy="150" r="20" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="200" cy="150" r="20" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="420" cy="150" r="20" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="470" cy="150" r="20" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <line x1="30" y1="130" x2="30" y2="150" stroke="#5b6776" stroke-width="2"/>
+        </svg>
+      </div>
+    </div>
+    <div class="view-card">
+      <h3>Vista lateral derecha</h3>
+      <div class="view-wrap" data-vista="LATERAL_DERECHA">
+        <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+          <rect x="30" y="30" width="500" height="100" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <line x1="30" y1="50" x2="530" y2="50" stroke="#3a444f" stroke-width="1"/>
+          <line x1="30" y1="110" x2="530" y2="110" stroke="#3a444f" stroke-width="1"/>
+          <rect x="470" y="40" width="40" height="20" fill="none" stroke="#3a444f"/>
+          <circle cx="150" cy="150" r="20" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="200" cy="150" r="20" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="420" cy="150" r="20" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="470" cy="150" r="20" fill="none" stroke="#5b6776" stroke-width="3"/>
+        </svg>
+      </div>
+    </div>
+    <div class="view-card">
+      <h3>Vista trasera</h3>
+      <div class="view-wrap" data-vista="TRASERA">
+        <svg viewBox="0 0 300 220" xmlns="http://www.w3.org/2000/svg">
+          <rect x="40" y="20" width="220" height="150" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <line x1="150" y1="20" x2="150" y2="170" stroke="#3a444f" stroke-width="1.5"/>
+          <rect x="55" y="40" width="20" height="60" fill="none" stroke="#3a444f"/>
+          <rect x="225" y="40" width="20" height="60" fill="none" stroke="#3a444f"/>
+          <circle cx="90"  cy="195" r="16" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="125" cy="195" r="16" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="175" cy="195" r="16" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="210" cy="195" r="16" fill="none" stroke="#5b6776" stroke-width="3"/>
+        </svg>
+      </div>
+    </div>
+    <div class="view-card">
+      <h3>Vista frontal</h3>
+      <div class="view-wrap" data-vista="FRONTAL">
+        <svg viewBox="0 0 260 200" xmlns="http://www.w3.org/2000/svg">
+          <path d="M40 170 L40 60 Q40 20 90 20 L170 20 Q220 20 220 60 L220 170 Z" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <rect x="60" y="160" width="140" height="14" fill="none" stroke="#3a444f"/>
+          <line x1="40" y1="120" x2="220" y2="120" stroke="#3a444f" stroke-width="1"/>
+        </svg>
+      </div>
+    </div>
+    <div class="view-card" style="grid-column:1/-1;">
+      <h3>Vista superior (techo)</h3>
+      <div class="view-wrap" data-vista="TECHO">
+        <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="20" width="660" height="120" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <g stroke="#3a444f" stroke-width="1">
+            <line x1="60"  y1="20" x2="60"  y2="140"/><line x1="100" y1="20" x2="100" y2="140"/>
+            <line x1="140" y1="20" x2="140" y2="140"/><line x1="180" y1="20" x2="180" y2="140"/>
+            <line x1="220" y1="20" x2="220" y2="140"/><line x1="260" y1="20" x2="260" y2="140"/>
+            <line x1="300" y1="20" x2="300" y2="140"/><line x1="340" y1="20" x2="340" y2="140"/>
+            <line x1="380" y1="20" x2="380" y2="140"/><line x1="420" y1="20" x2="420" y2="140"/>
+            <line x1="460" y1="20" x2="460" y2="140"/><line x1="500" y1="20" x2="500" y2="140"/>
+            <line x1="540" y1="20" x2="540" y2="140"/><line x1="580" y1="20" x2="580" y2="140"/>
+            <line x1="620" y1="20" x2="620" y2="140"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <span><i style="background:#e0a32e"></i> Raspones</span>
+    <span><i style="background:#d65c5c"></i> Golpes</span>
+    <span><i style="background:#6f9fd6"></i> Abolladuras</span>
+    <span><i style="background:#b85cd6"></i> Perforaciones</span>
+    <span><i style="background:#8d99a8"></i> Otros</span>
+  </div>
+</div>
+
+<!-- ── Llantas ──────────────────────────────────────────────── -->
+<div class="panel">
+  <h2>Llantas</h2>
+  <table id="tablaLlantas">
+    <thead><tr><th>Posición</th><th>Cant.</th><th>Estado</th><th>Observaciones</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- ── Estructura y Componentes ─────────────────────────────── -->
+<div class="panel">
+  <h2>Estructura y componentes</h2>
+  <table id="tablaComponentes">
+    <thead><tr><th>Componente</th><th>Estado</th><th>Observaciones</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- ── Piso ─────────────────────────────────────────────────── -->
+<div class="panel">
+  <h2>Piso</h2>
+  <div class="grid grid-2">
+    <div class="field">
+      <label>Tipo de material del piso</label>
+      <div class="radio-pill">
+        <label><input type="radio" name="tipoMaterialPiso" value="MADERA"> Madera</label>
+        <label><input type="radio" name="tipoMaterialPiso" value="ALUMINIO"> Aluminio</label>
+        <label><input type="radio" name="tipoMaterialPiso" value="ACERO"> Acero</label>
+        <label><input type="radio" name="tipoMaterialPiso" value="OTRO"> Otro:
+          <input type="text" id="pisoMaterialOtro" style="width:90px;display:inline-block;">
+        </label>
+      </div>
+    </div>
+    <div class="field">
+      <label>Condición del piso</label>
+      <div class="radio-pill">
+        <label><input type="radio" name="condicionPiso" value="BUENO"> Bueno</label>
+        <label><input type="radio" name="condicionPiso" value="REGULAR"> Regular</label>
+        <label><input type="radio" name="condicionPiso" value="MALO"> Malo</label>
+      </div>
+      <input type="text" id="pisoObservaciones" placeholder="Observaciones del piso" style="margin-top:8px;">
+    </div>
+  </div>
+</div>
+
+<!-- ── Observaciones y dictamen ─────────────────────────────── -->
+<div class="panel">
+  <h2>Observaciones y dictamen</h2>
+  <div class="grid grid-2" style="margin-bottom:12px;">
+    <div class="field"><label>Observaciones generales</label><textarea id="observacionesGenerales"></textarea></div>
+    <div class="field"><label>Notas / observaciones adicionales</label><textarea id="notasAdicionales"></textarea></div>
+  </div>
+  <div class="grid grid-2">
+    <div class="field">
+      <label>Dictamen general</label>
+      <div class="dictamen-row">
+        <label><input type="radio" name="dictamenGeneral" value="APTO"> Apto para servicio</label>
+        <label><input type="radio" name="dictamenGeneral" value="NO_APTO"> No apto para servicio</label>
+      </div>
+    </div>
+    <div class="field"><label>Firma del inspector (nombre)</label><input type="text" id="firmaInspector"></div>
+  </div>
+</div>
+
+<div class="actions">
+  <button class="ghost" type="button" onclick="window.location.href='dashboard.html'">Inicio</button>
+  <button class="ghost" id="btnExportarPdf" type="button" hidden>Exportar a PDF</button>
+  <button class="ghost" id="btnLimpiar" type="button">Limpiar formulario</button>
+  <button class="primary" id="btnGuardar" type="button">Guardar check</button>
+</div>
+
+<div id="toast"></div>
+<div id="pdfSheet" class="pdf-sheet"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="app.js?v=4"></script>
+</body>
+</html>

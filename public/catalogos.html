@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogos del Sistema - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>📚 Catálogos del Sistema</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<div class="panel">
+    <div class="field" style="max-width:360px;margin-bottom:18px;">
+        <label>Catálogo</label>
+        <select id="selectCatalogo" onchange="cargarValores()">
+            <option value="">Selecciona un catálogo...</option>
+        </select>
+    </div>
+
+    <div id="bloqueCatalogo" style="display:none;">
+        <div class="grid" style="grid-template-columns:2fr auto;gap:12px;align-items:end;margin-bottom:18px;">
+            <div class="field">
+                <label>Buscar</label>
+                <input type="text" id="inputBusqueda" placeholder="Buscar por nombre..." oninput="filtrarFilas()">
+            </div>
+            <button class="primary" onclick="abrirModalAlta()">➕ Nuevo Valor</button>
+        </div>
+
+        <table>
+            <thead id="tablaEncabezado">
+                <!-- Se genera según el catálogo elegido -->
+            </thead>
+            <tbody id="tablaCuerpo">
+                <tr><td colspan="4" class="text-center hint">Selecciona un catálogo para ver sus valores.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL ALTA -->
+<div class="modal fade" id="modalNuevoValor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloModalNuevoValor">➕ Nuevo Valor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formNuevoValor">
+                    <!-- Los inputs (nombre + campos extra) se generan según el catálogo elegido -->
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" onclick="agregarValor()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    let catalogoActual = '';
+    let catalogosConfig = {}; // key -> { label, campos }
+    let filaEnEdicion = null; // ID de la fila que está en modo edición (solo puede haber una a la vez)
+    let modalNuevoValor = null;
+
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    function badgeEstatusValor(status) {
+        return parseInt(status) === 1
+            ? '<span class="badge badge-ok">Activo</span>'
+            : '<span class="badge badge-muted">Inactivo</span>';
+    }
+
+    function campoActual() {
+        return catalogosConfig[catalogoActual] || { label: '', campos: [] };
+    }
+
+    // Convierte el valor crudo de un campo (número o clave de un select) en
+    // el texto legible que se muestra en la tabla (p. ej. ID_TYPE_TRIP=1 -> "Local").
+    function textoCampo(campo, valor) {
+        if (campo.tipo === 'select') {
+            const opcion = (campo.opciones || []).find(o => String(o.value) === String(valor));
+            return opcion ? opcion.label : (valor ?? '—');
+        }
+        return (valor === null || valor === undefined || valor === '') ? '—' : valor;
+    }
+
+    // Genera el <input>/<select> para un campo extra, con un valor inicial opcional.
+    function inputCampo(campo, idSufijo, valorInicial) {
+        const idInput = `campo-${campo.columna}-${idSufijo}`;
+        if (campo.tipo === 'select') {
+            const opciones = (campo.opciones || []).map(o =>
+                `<option value="${o.value}" ${String(o.value) === String(valorInicial) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`
+            ).join('');
+            return `<select id="${idInput}" data-columna="${campo.columna}">${opciones}</select>`;
+        }
+        const valor = (valorInicial === undefined || valorInicial === null) ? '' : valorInicial;
+        return `<input type="number" step="${campo.paso || '1'}" id="${idInput}" data-columna="${campo.columna}" value="${escapeHtml(valor)}" placeholder="${escapeHtml(campo.label)}">`;
+    }
+
+    // Lee del DOM los valores de los campos extra de un formulario/fila y
+    // regresa el objeto { COLUMNA: valor, ... } que espera el backend.
+    function leerValoresCampos(campos, idSufijo) {
+        const valores = {};
+        campos.forEach(campo => {
+            const el = document.getElementById(`campo-${campo.columna}-${idSufijo}`);
+            valores[campo.columna] = el ? el.value : '';
+        });
+        return valores;
+    }
+
+    function cargarTiposCatalogo() {
+        fetch('/api/catalogos-admin/tipos')
+            .then(res => res.json())
+            .then(res => {
+                const select = document.getElementById('selectCatalogo');
+                if (!res.success) return;
+                res.data.forEach(cat => {
+                    catalogosConfig[cat.key] = { label: cat.label, campos: cat.campos || [] };
+                    const option = document.createElement('option');
+                    option.value = cat.key;
+                    option.textContent = cat.label;
+                    select.appendChild(option);
+                });
+            })
+            .catch(err => console.error('Error al cargar catálogos:', err));
+    }
+
+    function dibujarEncabezado() {
+        const campos = campoActual().campos;
+        const thead = document.getElementById('tablaEncabezado');
+        thead.innerHTML = `
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                ${campos.map(c => `<th>${escapeHtml(c.label)}</th>`).join('')}
+                <th>Estatus</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        `;
+    }
+
+    function dibujarFormularioAlta() {
+        const campos = campoActual().campos;
+        const form = document.getElementById('formNuevoValor');
+        document.getElementById('tituloModalNuevoValor').textContent = `➕ Nuevo Valor — ${campoActual().label}`;
+        form.innerHTML = `
+            <div class="field" style="margin-bottom:14px;">
+                <label>Nombre</label>
+                <input type="text" id="inputNuevoValor" placeholder="Nombre del nuevo valor">
+            </div>
+            ${campos.map(c => `<div class="field" style="margin-bottom:14px;"><label>${escapeHtml(c.label)}</label>${inputCampo(c, 'nuevo')}</div>`).join('')}
+        `;
+    }
+
+    function abrirModalAlta() {
+        if (!catalogoActual) return;
+        dibujarFormularioAlta();
+        modalNuevoValor.show();
+    }
+
+    function cargarValores() {
+        catalogoActual = document.getElementById('selectCatalogo').value;
+        const bloque = document.getElementById('bloqueCatalogo');
+        const tbody = document.getElementById('tablaCuerpo');
+        filaEnEdicion = null;
+        document.getElementById('inputBusqueda').value = '';
+
+        if (!catalogoActual) {
+            bloque.style.display = 'none';
+            return;
+        }
+        bloque.style.display = '';
+        dibujarEncabezado();
+
+        const colspan = 4 + campoActual().campos.length;
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center hint">Cargando...</td></tr>`;
+
+        fetch(`/api/catalogos-admin/${catalogoActual}`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success || res.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center hint">Sin valores registrados.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = '';
+                res.data.forEach(item => tbody.appendChild(filaVista(item)));
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>`;
+            });
+    }
+
+    function filtrarFilas() {
+        const texto = document.getElementById('inputBusqueda').value.trim().toLowerCase();
+        document.querySelectorAll('#tablaCuerpo tr[id^="fila-"]').forEach(fila => {
+            const nombre = (fila.dataset.nombre || '').toLowerCase();
+            fila.style.display = nombre.includes(texto) ? '' : 'none';
+        });
+    }
+
+    function filaVista(item) {
+        const campos = campoActual().campos;
+        const fila = document.createElement('tr');
+        fila.id = `fila-${item.ID}`;
+        fila.dataset.nombre = item.NOMBRE || '';
+        fila.innerHTML = `
+            <td>${escapeHtml(item.ID)}</td>
+            <td>${escapeHtml(item.NOMBRE)}</td>
+            ${campos.map(c => `<td>${escapeHtml(textoCampo(c, item[c.columna]))}</td>`).join('')}
+            <td>${badgeEstatusValor(item.STATUS)}</td>
+            <td class="text-center">
+                <button class="ghost" title="Editar" onclick='editarValor(${item.ID}, ${JSON.stringify(item).replace(/'/g, "&#39;")})'>✏️</button>
+                ${parseInt(item.STATUS) === 1
+                    ? `<button class="ghost" style="color:var(--bad);" title="Desactivar" onclick="cambiarEstatusValor(${item.ID}, 0)">🚫</button>`
+                    : `<button class="ghost" style="color:var(--ok);" title="Activar" onclick="cambiarEstatusValor(${item.ID}, 1)">✅</button>`}
+            </td>
+        `;
+        return fila;
+    }
+
+    function agregarValor() {
+        if (!catalogoActual) return;
+        const inputNombre = document.getElementById('inputNuevoValor');
+        const nombre = inputNombre.value.trim();
+        if (!nombre) {
+            showAlert('Escribe un nombre antes de agregar.', 'error');
+            return;
+        }
+        const valores = leerValoresCampos(campoActual().campos, 'nuevo');
+
+        fetch(`/api/catalogos-admin/${catalogoActual}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre, valores })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                modalNuevoValor.hide();
+                showAlert(res.message, 'success');
+                cargarValores();
+            } else {
+                showAlert(res.message || 'No se pudo agregar el valor.', 'error');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showAlert('Error al conectar con el servidor.', 'error');
+        });
+    }
+
+    function editarValor(id, item) {
+        // Solo una fila en edición a la vez.
+        if (filaEnEdicion !== null && filaEnEdicion !== id) {
+            cargarValores();
+        }
+        filaEnEdicion = id;
+        const campos = campoActual().campos;
+        const fila = document.getElementById(`fila-${id}`);
+
+        fila.innerHTML = `
+            <td>${escapeHtml(id)}</td>
+            <td><input type="text" id="campo-nombre-${id}" value="${escapeHtml(item.NOMBRE)}" style="width:100%;"></td>
+            ${campos.map(c => `<td>${inputCampo(c, id, item[c.columna])}</td>`).join('')}
+            <td>${badgeEstatusValor(item.STATUS)}</td>
+            <td class="text-center">
+                <button class="ghost" style="color:var(--ok);" title="Guardar" onclick="guardarEdicion(${id})">💾</button>
+                <button class="ghost" title="Cancelar" onclick="cargarValores()">✖️</button>
+            </td>
+        `;
+    }
+
+    function guardarEdicion(id) {
+        const nombre = document.getElementById(`campo-nombre-${id}`).value.trim();
+        if (!nombre) {
+            showAlert('El nombre no puede quedar vacío.', 'error');
+            return;
+        }
+        const valores = leerValoresCampos(campoActual().campos, id);
+
+        fetch(`/api/catalogos-admin/${catalogoActual}/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre, valores })
+        })
+        .then(res => res.json())
+        .then(res => {
+            filaEnEdicion = null;
+            if (res.success) {
+                showAlert(res.message, 'success');
+                cargarValores();
+            } else {
+                showAlert(res.message || 'No se pudo actualizar.', 'error');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showAlert('Error al conectar con el servidor.', 'error');
+        });
+    }
+
+    async function cambiarEstatusValor(id, nuevoEstatus) {
+        const mensaje = nuevoEstatus === 1 ? '¿Activar este valor?' : '¿Desactivar este valor?';
+        const ok = await showConfirm(mensaje, {
+            type: nuevoEstatus === 1 ? 'success' : 'danger',
+            title: nuevoEstatus === 1 ? 'Activar valor' : 'Desactivar valor',
+            confirmText: nuevoEstatus === 1 ? 'Activar' : 'Desactivar'
+        });
+        if (!ok) return;
+
+        fetch(`/api/catalogos-admin/${catalogoActual}/${id}/estatus`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: nuevoEstatus })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+                cargarValores();
+            } else {
+                showAlert(res.message || 'No se pudo actualizar el estatus.', 'error');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showAlert('Error al conectar con el servidor.', 'error');
+        });
+    }
+
+    modalNuevoValor = new bootstrap.Modal(document.getElementById('modalNuevoValor'));
+    cargarTiposCatalogo();
+</script>
+
+</body>
+</html>

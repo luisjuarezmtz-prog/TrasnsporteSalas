@@ -1,0 +1,76 @@
+/* Gestión de Viajes — tema oscuro/ámbar (hereda variables de style.css) */
+
+body { max-width: 1900px; }
+.container { background: var(--panel); border: 1px solid var(--line); padding: 20px; border-radius: 8px; }
+h2 { font-family: var(--mono); font-size: 15px; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--amber); border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-top: 0; }
+
+/* Contenedor de filtros */
+.search-container {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    padding: 15px;
+    border-radius: 6px;
+}
+.search-container label { margin-bottom: 2px; }
+.search-input {
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    outline: none;
+    transition: 0.2s;
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--ink);
+}
+.search-input:focus { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(224,163,46,.2); }
+.filter-select { width: 220px; cursor: pointer; }
+
+/* Tabla - Ajustado min-width para acomodar la nueva columna */
+.table-wrapper { overflow-x: auto; max-height: 600px; }
+table { width: 100%; border-collapse: collapse; margin-top: 10px; min-width: 1900px; }
+th, td { padding: 10px 8px; border: 1px solid var(--line); text-align: left; font-size: 12.5px; }
+th { background: var(--panel-2); color: var(--ink-dim); position: sticky; top: 0; z-index: 10;
+  font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+tr:hover { background: var(--panel-2); }
+
+/* Estilos de badges y botones */
+.badge { background: var(--ok); color: #10141a; padding: 3px 9px; border-radius: 50px; font-weight: bold; font-size: 11px; }
+.status-pill { background: var(--panel-2); color: var(--ink-dim); padding: 4px 10px; border-radius: 4px;
+  font-weight: 600; font-size: 10.5px; text-transform: uppercase; border: 1px solid var(--line); }
+.btn-regresar { background: transparent; color: var(--ink); border: 1px solid var(--line); padding: 9px 18px;
+  text-decoration: none; border-radius: 5px; display: inline-block; margin-bottom: 20px; transition: 0.2s;
+  font-family: var(--mono); font-size: 12px; text-transform: uppercase; }
+.btn-regresar:hover { border-color: var(--amber); color: var(--amber); }
+.btn-edit { background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+.btn-save { background: var(--ok); color: #10141a; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; display: none; font-weight: 700; }
+.btn-cancel { background: var(--bad); color: #10141a; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; display: none; margin-left: 3px; font-weight: 700; }
+.btn-clear { background: transparent; border: 1px solid var(--line); color: var(--ink); padding: 9px 18px; border-radius: 20px; cursor: pointer; font-size: 12.5px; font-weight: 600; }
+.btn-clear:hover { border-color: var(--amber); color: var(--amber); }
+
+.btn-excel {
+    background: #1d6f42;
+    color: white; border: 1px solid #1d6f42; padding: 9px 18px; border-radius: 20px;
+    cursor: pointer; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+}
+.btn-excel:hover { filter: brightness(1.15); }
+
+input.edit-mode, select.edit-mode {
+    width: 90%; padding: 6px; border: 1px solid var(--amber); border-radius: 4px; background: var(--bg); color: var(--ink);
+}
+.monto { font-family: var(--mono); font-weight: bold; color: var(--ink); white-space: nowrap; }
+.emp-text { font-style: italic; color: var(--amber); font-weight: 600; }
+
+.status-pill.cancelado {
+    background: var(--bad);
+    color: #10141a;
+    border-color: var(--bad);
+}
+
+/* Estilo para centrar el checkbox de físico */
+.check-fisico { transform: scale(1.3); cursor: pointer; display: block; margin: 0 auto; accent-color: var(--amber); }

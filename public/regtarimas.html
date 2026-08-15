@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Tarimas - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+    <div class="brand">
+        <h1>Registro de Tarimas</h1>
+        <a href="dashboard.html" class="link-plain tag">← Volver al Inicio</a>
+    </div>
+
+    <div class="panel" style="max-width:480px;margin:0 auto;">
+        <form id="formRegistroTarimas">
+            <div class="field" style="margin-bottom:10px;">
+                <label for="foliofactura">Folio Factura (INVOICE_INTER)</label>
+                <input type="text" id="foliofactura" placeholder="Ej: F-12345" required>
+            </div>
+
+            <div style="margin-bottom:16px;">
+                <button type="button" id="btnbuscar" class="ghost">🔍 Buscar Folio</button>
+            </div>
+
+            <div style="border-top:1px solid var(--line);margin-bottom:16px;"></div>
+
+            <div class="field" style="margin-bottom:12px;">
+                <label for="cedi">Nombre del CEDIS</label>
+                <input type="text" id="cedi" placeholder="---" readonly>
+            </div>
+
+            <div class="field" style="margin-bottom:12px;">
+                <label for="empleado">Nombre del Empleado</label>
+                <input type="text" id="empleado" placeholder="---" readonly>
+            </div>
+
+            <div class="field" style="margin-bottom:12px;">
+                <label for="fechaentrega">Fecha de Entrega</label>
+                <input type="date" id="fechaentrega" readonly>
+            </div>
+
+            <div class="field" style="margin-bottom:18px;">
+                <label for="num_tarimas">Núm. Tarimas</label>
+                <input type="number" id="num_tarimas" value="0" min="0">
+            </div>
+
+            <div class="actions" style="justify-content:space-between;">
+                <button type="button" class="ghost" onclick="window.location.href='dashboard.html'">Volver al Inicio</button>
+                <button type="submit" id="btnRegistrar" class="primary">Finalizar Registro</button>
+            </div>
+        </form>
+
+        <p id="message" class="hint" style="margin-top:12px;text-align:center;"></p>
+    </div>
+
+    <script>
+        document.getElementById('foliofactura').addEventListener('input', () => {
+            document.getElementById('message').textContent = '';
+        });
+
+        // BUSCAR FOLIO
+        document.getElementById('btnbuscar').addEventListener('click', async () => {
+            const invoiceInter = document.getElementById('foliofactura').value;
+            const messageDiv = document.getElementById('message');
+
+            if (!invoiceInter) {
+                messageDiv.style.color = 'var(--bad)';
+                messageDiv.textContent = '⚠️ Ingresa un folio de factura.';
+                return;
+            }
+
+            messageDiv.style.color = 'var(--amber)';
+            messageDiv.textContent = '🔍 Consultando historial...';
+
+            try {
+                const response = await fetch(`/api/buscar-folio-factura?invoice=${invoiceInter}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('cedi').value = data.cedi_name || 'No definido';
+                    document.getElementById('empleado').value = data.empleado_nombre || 'No asignado';
+                    document.getElementById('fechaentrega').value = data.fecha || '';
+
+                    messageDiv.style.color = 'var(--ok)';
+                    messageDiv.textContent = '✅ Datos recuperados correctamente.';
+                } else {
+                    messageDiv.style.color = 'var(--bad)';
+                    messageDiv.textContent = '❌ ' + (data.message || 'Folio no encontrado.');
+                    limpiarCampos();
+                }
+            } catch (error) {
+                messageDiv.style.color = 'var(--bad)';
+                messageDiv.textContent = '🚫 Error de conexión.';
+            }
+        });
+
+        // REGISTRAR FINAL (POST)
+        document.getElementById('formRegistroTarimas').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const messageDiv = document.getElementById('message');
+
+            if (!document.getElementById('cedi').value || document.getElementById('cedi').value === "---") {
+                messageDiv.style.color = 'var(--bad)';
+                messageDiv.textContent = "❌ Error: Debes validar el folio primero.";
+                return;
+            }
+
+            const payload = {
+                folio_factura: document.getElementById('foliofactura').value,
+                // parseInt asegura que si el campo está vacío se envíe un 0
+                num_tarimas: parseInt(document.getElementById('num_tarimas').value) || 0,
+                num_vales: 0,
+                usuario_que_registra: localStorage.getItem('username') || 'Sistema'
+            };
+
+            try {
+                const response = await fetch('/api/registrar-tarimas-final', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert("Registro e Historial guardados correctamente.", "success", 2200).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    messageDiv.style.color = 'var(--bad)';
+                    messageDiv.textContent = "❌ " + result.message;
+                }
+            } catch (error) {
+                messageDiv.style.color = 'var(--bad)';
+                messageDiv.textContent = "🚫 Error al completar el registro.";
+            }
+        });
+
+        function limpiarCampos() {
+            document.getElementById('cedi').value = '';
+            document.getElementById('empleado').value = '';
+            document.getElementById('fechaentrega').value = '';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Empleados - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>🧑‍💼 Gestión de Empleados</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<div class="panel">
+    <div class="grid" style="grid-template-columns:2fr 1fr auto auto;gap:12px;align-items:end;margin-bottom:18px;">
+        <div class="field">
+            <label>Buscar</label>
+            <input type="text" id="inputBusqueda" placeholder="Nombre, apellido o RFC">
+        </div>
+        <div class="field">
+            <label>Estatus</label>
+            <select id="selectEstatus">
+                <option value="1" selected>Activos</option>
+                <option value="0">Inactivos (baja)</option>
+                <option value="todos">Todos</option>
+            </select>
+        </div>
+        <button class="primary" onclick="cargarEmpleados()">🔍 Buscar</button>
+        <button class="primary" onclick="abrirModalAlta()">➕ Nuevo Empleado</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th></th>
+                <th>ID</th>
+                <th>Nombre completo</th>
+                <th>Tipo</th>
+                <th>Operador</th>
+                <th>Teléfono</th>
+                <th>Estatus</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            <tr><td colspan="8" class="text-center hint">Cargando empleados...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- MODAL ALTA / EDICIÓN -->
+<div class="modal fade" id="modalEmpleado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloModalEmpleado">➕ Nuevo Empleado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEmpleado">
+                    <input type="hidden" id="edit_id">
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:14px;">Datos Personales</h6>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Nombre(s) *</label>
+                            <input type="text" id="first_name" required>
+                        </div>
+                        <div class="field">
+                            <label>Apellido Paterno *</label>
+                            <input type="text" id="parental_last" required>
+                        </div>
+                        <div class="field">
+                            <label>Apellido Materno</label>
+                            <input type="text" id="mother_last">
+                        </div>
+                    </div>
+                    <div class="grid grid-4" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Género</label>
+                            <select id="id_gender">
+                                <option value="">-- Seleccione --</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Fecha de Nacimiento</label>
+                            <input type="date" id="birthday">
+                        </div>
+                        <div class="field">
+                            <label>Lugar de Nacimiento</label>
+                            <input type="text" id="birthplace">
+                        </div>
+                        <div class="field">
+                            <label>Correo</label>
+                            <input type="email" id="mail">
+                        </div>
+                    </div>
+                    <div class="grid grid-2" style="margin-bottom:8px;">
+                        <div class="field">
+                            <label>RFC</label>
+                            <input type="text" id="rfc" maxlength="13" style="text-transform:uppercase;">
+                        </div>
+                        <div class="field">
+                            <label>CURP</label>
+                            <input type="text" id="curp" maxlength="18" style="text-transform:uppercase;">
+                        </div>
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:18px 0 14px;">Datos Laborales</h6>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Tipo de Empleado</label>
+                            <select id="id_employee_type">
+                                <option value="">-- Seleccione --</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Tipo de Contrato</label>
+                            <select id="id_contract_type">
+                                <option value="">-- Seleccione --</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Escolaridad</label>
+                            <select id="id_education">
+                                <option value="">-- Seleccione --</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-3" style="margin-bottom:8px;align-items:center;">
+                        <div class="field">
+                            <label>No. IMSS</label>
+                            <input type="text" id="imss" maxlength="15" inputmode="numeric">
+                        </div>
+                        <div class="field">
+                            <label>Salario</label>
+                            <input type="number" step="0.01" id="salary">
+                        </div>
+                        <div class="field" style="display:flex;align-items:center;gap:8px;margin-top:18px;">
+                            <input type="checkbox" id="operador">
+                            <label for="operador" style="margin:0;text-transform:none;">¿Es Operador?</label>
+                        </div>
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:18px 0 14px;">Domicilio</h6>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Estado</label>
+                            <input type="text" id="state">
+                        </div>
+                        <div class="field">
+                            <label>Ciudad</label>
+                            <input type="text" id="city">
+                        </div>
+                        <div class="field">
+                            <label>Colonia</label>
+                            <input type="text" id="colonia">
+                        </div>
+                    </div>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field" style="grid-column:span 1;">
+                            <label>Calle</label>
+                            <input type="text" id="street">
+                        </div>
+                        <div class="field">
+                            <label>No. Exterior</label>
+                            <input type="text" id="exterior_number">
+                        </div>
+                        <div class="field">
+                            <label>No. Interior</label>
+                            <input type="text" id="interior_number">
+                        </div>
+                    </div>
+                    <div class="grid grid-3" style="margin-bottom:8px;">
+                        <div class="field">
+                            <label>Código Postal</label>
+                            <input type="number" id="post_code">
+                        </div>
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:18px 0 14px;">Contacto</h6>
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Teléfono Celular</label>
+                            <input type="text" id="cell_phone" maxlength="15">
+                        </div>
+                        <div class="field">
+                            <label>Teléfono de Casa</label>
+                            <input type="text" id="home_phone" maxlength="15">
+                        </div>
+                    </div>
+                    <div class="grid grid-2">
+                        <div class="field">
+                            <label>Contacto de Emergencia</label>
+                            <input type="text" id="emergency_contact">
+                        </div>
+                        <div class="field">
+                            <label>Teléfono de Emergencia</label>
+                            <input type="text" id="emergency_number" maxlength="12">
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Foto, cuentas bancarias y documentos solo aplican a un empleado
+                     que ya existe (necesitan su ID_EMPLOYEE); se muestran siempre,
+                     pero permanecen deshabilitadas hasta que se guarde por primera
+                     vez el formulario de arriba. -->
+                <p id="avisoGuardarPrimero" class="hint" style="margin:18px 0 0;">
+                    Guarda los datos generales del empleado para poder agregar su foto, cuentas bancarias y documentos.
+                </p>
+
+                <div id="seccionesExtra">
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:18px 0 14px;">Foto de Perfil</h6>
+                    <div style="display:flex;gap:16px;align-items:center;margin-bottom:8px;">
+                        <img id="previewFoto" src="" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--panel-2);border:1px solid var(--line);display:none;">
+                        <span id="placeholderFoto" style="font-size:44px;">👤</span>
+                        <div class="field" style="flex:1;margin:0;">
+                            <input type="file" id="input_foto" accept="image/png,image/jpeg">
+                        </div>
+                        <button type="button" class="ghost" onclick="subirFoto()">📤 Subir Foto</button>
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:22px 0 14px;">Cuentas Bancarias</h6>
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="panel" style="margin-bottom:0;padding:14px 16px;">
+                            <p class="hint" style="margin:0 0 10px;text-transform:uppercase;font-family:var(--mono);color:var(--ink);">Principal</p>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>No. de Cuenta</label>
+                                <input type="text" id="principal_account_number">
+                            </div>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>No. de Tarjeta</label>
+                                <input type="text" id="principal_card_number" maxlength="19">
+                            </div>
+                            <div class="field">
+                                <label>CLABE Interbancaria</label>
+                                <input type="text" id="principal_clabe" maxlength="18">
+                            </div>
+                        </div>
+                        <div class="panel" style="margin-bottom:0;padding:14px 16px;">
+                            <p class="hint" style="margin:0 0 10px;text-transform:uppercase;font-family:var(--mono);color:var(--ink);">Provisional</p>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>No. de Cuenta</label>
+                                <input type="text" id="provisional_account_number">
+                            </div>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>No. de Tarjeta</label>
+                                <input type="text" id="provisional_card_number" maxlength="19">
+                            </div>
+                            <div class="field">
+                                <label>CLABE Interbancaria</label>
+                                <input type="text" id="provisional_clabe" maxlength="18">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="actions" style="margin-bottom:8px;">
+                        <button type="button" class="ghost" onclick="guardarCuentasBancarias()">💾 Guardar Cuentas Bancarias</button>
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:22px 0 14px;">Documentos</h6>
+                    <div class="grid" style="grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin-bottom:14px;">
+                        <div class="field">
+                            <label>Tipo de Documento</label>
+                            <select id="select_tipo_documento">
+                                <option value="">-- Seleccione --</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Archivo (PDF, JPG o PNG)</label>
+                            <input type="file" id="input_documento" accept="application/pdf,image/png,image/jpeg">
+                        </div>
+                        <button type="button" class="ghost" onclick="agregarDocumento()">➕ Agregar</button>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Archivo</th>
+                                <th>Fecha</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaDocumentosCuerpo">
+                            <tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" onclick="guardarEmpleado()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    const modalEmpleado = new bootstrap.Modal(document.getElementById('modalEmpleado'));
+    let catalogos = { tiposEmpleado: [], tiposContrato: [], educaciones: [], generos: [], tiposDocumento: [] };
+
+    async function cargarCatalogos() {
+        try {
+            const res = await fetch('/api/empleados-catalogos');
+            const data = await res.json();
+            if (!data.success) return;
+            catalogos = data;
+
+            llenarSelect('id_employee_type', catalogos.tiposEmpleado, 'ID_EMPLOYEE_TYPE', 'EMPLOYEE_TYPE_NAME');
+            llenarSelect('id_contract_type', catalogos.tiposContrato, 'ID_CONTRACT_TYPE', 'CONTRACT_TYPE_NAME');
+            llenarSelect('id_education', catalogos.educaciones, 'ID_EDUCATION', 'EDUCATION_NAME');
+            llenarSelect('id_gender', catalogos.generos, 'ID_GENDER', 'GENDER_NAME');
+            llenarSelect('select_tipo_documento', catalogos.tiposDocumento, 'ID_DOCUMENT_TYPE', 'DOCUMENT_TYPE_NAME');
+        } catch (error) {
+            console.error('Error al cargar catálogos:', error);
+        }
+    }
+
+    function llenarSelect(idSelect, filas, campoId, campoNombre) {
+        const select = document.getElementById(idSelect);
+        filas.forEach(fila => {
+            const option = document.createElement('option');
+            option.value = fila[campoId];
+            option.textContent = fila[campoNombre];
+            select.appendChild(option);
+        });
+    }
+
+    function cargarEmpleados() {
+        const estatus = document.getElementById('selectEstatus').value;
+        const busqueda = document.getElementById('inputBusqueda').value.trim();
+        const tbody = document.getElementById('tablaCuerpo');
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center hint">Cargando empleados...</td></tr>';
+
+        const params = new URLSearchParams();
+        if (estatus) params.set('estatus', estatus);
+        if (busqueda) params.set('busqueda', busqueda);
+
+        fetch(`/api/empleados-consulta?${params.toString()}`)
+            .then(res => res.json())
+            .then(res => {
+                tbody.innerHTML = '';
+
+                if (!res.success || res.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center hint">No se encontraron empleados.</td></tr>';
+                    return;
+                }
+
+                res.data.forEach(emp => {
+                    const activo = parseInt(emp.STATUS) === 1;
+                    const badgeEstatus = activo
+                        ? '<span class="badge badge-ok">Activo</span>'
+                        : '<span class="badge badge-muted">Baja</span>';
+                    const badgeOperador = parseInt(emp.OPERADOR) === 1
+                        ? '<span class="badge badge-info">Sí</span>'
+                        : '<span class="hint">—</span>';
+                    const nombreCompleto = `${emp.FIRST_NAME || ''} ${emp.MIDDLE_NAME || ''} ${emp.PARENTAL_LAST || ''} ${emp.MOTHER_LAST || ''}`.replace(/\s+/g, ' ').trim();
+                    const foto = emp.PHOTO_PATH
+                        ? `<img src="${escapeHtml(emp.PHOTO_PATH)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;display:block;">`
+                        : `<span style="font-size:20px;">👤</span>`;
+
+                    const botonEstatus = activo
+                        ? `<button class="ghost" style="color:var(--bad);" title="Dar de baja" onclick="cambiarEstatus(${emp.ID_EMPLOYEE}, 0)">🚫</button>`
+                        : `<button class="ghost" style="color:var(--ok);" title="Reactivar" onclick="cambiarEstatus(${emp.ID_EMPLOYEE}, 1)">✅</button>`;
+
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td>${foto}</td>
+                        <td>${escapeHtml(emp.ID_EMPLOYEE)}</td>
+                        <td>${escapeHtml(nombreCompleto)}</td>
+                        <td>${escapeHtml(emp.EMPLOYEE_TYPE_NAME || '—')}</td>
+                        <td>${badgeOperador}</td>
+                        <td>${escapeHtml(emp.CELL_PHONE || '—')}</td>
+                        <td>${badgeEstatus}</td>
+                        <td class="text-center">
+                            <button class="ghost" title="Editar" onclick="abrirModalEdicion(${emp.ID_EMPLOYEE})">✏️</button>
+                            ${botonEstatus}
+                        </td>
+                    `;
+                    tbody.appendChild(fila);
+                });
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+            });
+    }
+
+    function limpiarFormulario() {
+        document.getElementById('formEmpleado').reset();
+        document.getElementById('edit_id').value = '';
+        document.getElementById('input_foto').value = '';
+        document.getElementById('input_documento').value = '';
+        document.getElementById('principal_account_number').value = '';
+        document.getElementById('principal_card_number').value = '';
+        document.getElementById('principal_clabe').value = '';
+        document.getElementById('provisional_account_number').value = '';
+        document.getElementById('provisional_card_number').value = '';
+        document.getElementById('provisional_clabe').value = '';
+        document.getElementById('tablaDocumentosCuerpo').innerHTML = '<tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>';
+        actualizarPreviewFoto(null);
+    }
+
+    // Las secciones de foto/cuentas/documentos siempre se ven, pero solo se
+    // pueden usar cuando el empleado ya existe (necesitan su ID_EMPLOYEE
+    // para guardar), así que mientras tanto se deshabilitan sus controles.
+    function mostrarSeccionesExtra(habilitar) {
+        const contenedor = document.getElementById('seccionesExtra');
+        contenedor.querySelectorAll('input, select, button').forEach(el => {
+            el.disabled = !habilitar;
+        });
+        contenedor.style.opacity = habilitar ? '1' : '0.5';
+        document.getElementById('avisoGuardarPrimero').style.display = habilitar ? 'none' : 'block';
+    }
+
+    function actualizarPreviewFoto(rutaFoto) {
+        const img = document.getElementById('previewFoto');
+        const placeholder = document.getElementById('placeholderFoto');
+        if (rutaFoto) {
+            img.src = rutaFoto;
+            img.style.display = 'block';
+            placeholder.style.display = 'none';
+        } else {
+            img.style.display = 'none';
+            placeholder.style.display = 'block';
+        }
+    }
+
+    function abrirModalAlta() {
+        limpiarFormulario();
+        mostrarSeccionesExtra(false);
+        document.getElementById('tituloModalEmpleado').innerHTML = '➕ Nuevo Empleado';
+        modalEmpleado.show();
+    }
+
+    async function abrirModalEdicion(id) {
+        try {
+            const res = await fetch(`/api/empleados/${id}/detalle`);
+            const data = await res.json();
+            if (!data.success) return showAlert(data.message || 'No se pudo cargar el empleado.', 'error');
+
+            const emp = data.data;
+            limpiarFormulario();
+            document.getElementById('edit_id').value = emp.ID_EMPLOYEE;
+            document.getElementById('first_name').value = emp.FIRST_NAME || '';
+            document.getElementById('parental_last').value = emp.PARENTAL_LAST || '';
+            document.getElementById('mother_last').value = emp.MOTHER_LAST || '';
+            document.getElementById('id_gender').value = emp.ID_GENDER || '';
+            document.getElementById('birthday').value = emp.BIRTHDAY ? emp.BIRTHDAY.split('T')[0] : '';
+            document.getElementById('birthplace').value = emp.BIRTHPLACE || '';
+            document.getElementById('mail').value = emp.MAIL || '';
+            document.getElementById('rfc').value = emp.RFC || '';
+            document.getElementById('curp').value = emp.CURP || '';
+            document.getElementById('id_employee_type').value = emp.ID_EMPLOYEE_TYPE || '';
+            document.getElementById('id_contract_type').value = emp.ID_CONTRACT_TYPE || '';
+            document.getElementById('id_education').value = emp.ID_EDUCATION || '';
+            document.getElementById('imss').value = emp.IMSS || '';
+            document.getElementById('salary').value = emp.SALARY || '';
+            document.getElementById('operador').checked = parseInt(emp.OPERADOR) === 1;
+            document.getElementById('state').value = emp.STATE || '';
+            document.getElementById('city').value = emp.CITY || '';
+            document.getElementById('colonia').value = emp.COLONIA || '';
+            document.getElementById('street').value = emp.STREET || '';
+            document.getElementById('exterior_number').value = emp.EXTERIOR_NUMBER || '';
+            document.getElementById('interior_number').value = emp.INTERIOR_NUMBER || '';
+            document.getElementById('post_code').value = emp.POST_CODE || '';
+            document.getElementById('cell_phone').value = emp.CELL_PHONE || '';
+            document.getElementById('home_phone').value = emp.HOME_PHONE || '';
+            document.getElementById('emergency_contact').value = emp.EMERGENCY_CONTACT || '';
+            document.getElementById('emergency_number').value = emp.EMERGENCY_NUMBER || '';
+
+            actualizarPreviewFoto(emp.PHOTO_PATH || null);
+            mostrarSeccionesExtra(true);
+            cargarCuentasBancarias(emp.ID_EMPLOYEE);
+            cargarDocumentos(emp.ID_EMPLOYEE);
+
+            document.getElementById('tituloModalEmpleado').innerHTML = '✏️ Editar Empleado';
+            modalEmpleado.show();
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Error al conectar con el servidor.', 'error');
+        }
+    }
+
+    function guardarEmpleado() {
+        const id = document.getElementById('edit_id').value;
+        const esEdicion = id !== '';
+
+        const data = {
+            first_name: document.getElementById('first_name').value.trim(),
+            parental_last: document.getElementById('parental_last').value.trim(),
+            mother_last: document.getElementById('mother_last').value.trim(),
+            id_gender: document.getElementById('id_gender').value || null,
+            birthday: document.getElementById('birthday').value || null,
+            birthplace: document.getElementById('birthplace').value.trim(),
+            mail: document.getElementById('mail').value.trim(),
+            rfc: document.getElementById('rfc').value.trim().toUpperCase(),
+            curp: document.getElementById('curp').value.trim().toUpperCase(),
+            id_employee_type: document.getElementById('id_employee_type').value || null,
+            id_contract_type: document.getElementById('id_contract_type').value || null,
+            id_education: document.getElementById('id_education').value || null,
+            imss: document.getElementById('imss').value || null,
+            salary: document.getElementById('salary').value || null,
+            operador: document.getElementById('operador').checked ? 1 : 0,
+            state: document.getElementById('state').value.trim(),
+            city: document.getElementById('city').value.trim(),
+            colonia: document.getElementById('colonia').value.trim(),
+            street: document.getElementById('street').value.trim(),
+            exterior_number: document.getElementById('exterior_number').value.trim(),
+            interior_number: document.getElementById('interior_number').value.trim(),
+            post_code: document.getElementById('post_code').value || null,
+            cell_phone: document.getElementById('cell_phone').value.trim(),
+            home_phone: document.getElementById('home_phone').value.trim(),
+            emergency_contact: document.getElementById('emergency_contact').value.trim(),
+            emergency_number: document.getElementById('emergency_number').value.trim()
+        };
+
+        if (!data.first_name || !data.parental_last) {
+            return showAlert('Nombre y Apellido Paterno son obligatorios.', 'info');
+        }
+
+        const url = esEdicion ? `/api/empleados/${id}` : '/api/empleados';
+        const metodo = esEdicion ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: metodo,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (!res.success) {
+                return showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+
+            if (esEdicion) {
+                showAlert(res.message, 'success');
+                modalEmpleado.hide();
+                cargarEmpleados();
+                return;
+            }
+
+            // Alta: el empleado recién creado ya tiene ID_EMPLOYEE, así que
+            // dejamos el modal abierto (ahora en modo edición) para que se
+            // pueda agregar foto, cuentas bancarias y documentos de una vez,
+            // sin tener que volver a buscarlo y reabrirlo.
+            showAlert('Empleado registrado. Ya puedes agregar su foto, cuentas bancarias y documentos.', 'success', 3000);
+            document.getElementById('edit_id').value = res.id_employee;
+            document.getElementById('tituloModalEmpleado').innerHTML = '✏️ Editar Empleado';
+            mostrarSeccionesExtra(true);
+            cargarDocumentos(res.id_employee);
+            cargarEmpleados();
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    async function cambiarEstatus(id, nuevoEstatus) {
+        const mensaje = nuevoEstatus === 1
+            ? '¿Reactivar a este empleado?'
+            : '¿Dar de baja a este empleado?';
+
+        const ok = await showConfirm(mensaje, {
+            type: nuevoEstatus === 1 ? 'success' : 'danger',
+            title: nuevoEstatus === 1 ? 'Reactivar empleado' : 'Dar de baja',
+            confirmText: nuevoEstatus === 1 ? 'Reactivar' : 'Dar de baja'
+        });
+        if (!ok) return;
+
+        fetch(`/api/empleados/${id}/estatus`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: nuevoEstatus })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+                cargarEmpleados();
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    // ───────────────────────── FOTO DE PERFIL ─────────────────────────
+    function subirFoto() {
+        const id = document.getElementById('edit_id').value;
+        const archivo = document.getElementById('input_foto').files[0];
+        if (!archivo) return showAlert('Selecciona una foto primero.', 'info');
+
+        const formData = new FormData();
+        formData.append('foto', archivo);
+
+        fetch(`/api/empleados/${id}/foto`, { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    showAlert(res.message, 'success');
+                    actualizarPreviewFoto(res.photo_path);
+                    document.getElementById('input_foto').value = '';
+                    cargarEmpleados();
+                } else {
+                    showAlert(res.message || 'Ocurrió un error.', 'error');
+                }
+            })
+            .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    // ───────────────────────── CUENTAS BANCARIAS ─────────────────────────
+    function cargarCuentasBancarias(id) {
+        fetch(`/api/empleados/${id}/cuentas-bancarias`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success) return;
+                const { principal, provisional } = res.data;
+                document.getElementById('principal_account_number').value = principal ? (principal.ACCOUNT_NUMBER || '') : '';
+                document.getElementById('principal_card_number').value = principal ? (principal.CARD_NUMBER || '') : '';
+                document.getElementById('principal_clabe').value = principal ? (principal.CLABE || '') : '';
+                document.getElementById('provisional_account_number').value = provisional ? (provisional.ACCOUNT_NUMBER || '') : '';
+                document.getElementById('provisional_card_number').value = provisional ? (provisional.CARD_NUMBER || '') : '';
+                document.getElementById('provisional_clabe').value = provisional ? (provisional.CLABE || '') : '';
+            })
+            .catch(err => console.error('Error al cargar cuentas bancarias:', err));
+    }
+
+    function guardarCuentasBancarias() {
+        const id = document.getElementById('edit_id').value;
+        const data = {
+            principal: {
+                account_number: document.getElementById('principal_account_number').value.trim(),
+                card_number: document.getElementById('principal_card_number').value.trim(),
+                clabe: document.getElementById('principal_clabe').value.trim()
+            },
+            provisional: {
+                account_number: document.getElementById('provisional_account_number').value.trim(),
+                card_number: document.getElementById('provisional_card_number').value.trim(),
+                clabe: document.getElementById('provisional_clabe').value.trim()
+            }
+        };
+
+        fetch(`/api/empleados/${id}/cuentas-bancarias`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    // ───────────────────────── DOCUMENTOS ─────────────────────────
+    function formatearFecha(fechaIso) {
+        if (!fechaIso) return '—';
+        const f = new Date(fechaIso);
+        return f.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    }
+
+    function cargarDocumentos(id) {
+        const tbody = document.getElementById('tablaDocumentosCuerpo');
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center hint">Cargando documentos...</td></tr>';
+
+        fetch(`/api/empleados/${id}/documentos`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success || res.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                res.data.forEach(docu => {
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td>${escapeHtml(docu.DOCUMENT_TYPE_NAME)}</td>
+                        <td><a href="${docu.FILE_PATH}" target="_blank" rel="noopener">${escapeHtml(docu.FILE_NAME)}</a></td>
+                        <td>${formatearFecha(docu.UPLOAD_DATE)}</td>
+                        <td class="text-center">
+                            <button class="ghost" style="color:var(--bad);" title="Eliminar" onclick="eliminarDocumento(${docu.ID_DOCUMENT}, ${id})">🗑️</button>
+                        </td>
+                    `;
+                    tbody.appendChild(fila);
+                });
+            })
+            .catch(err => {
+                console.error('Error al cargar documentos:', err);
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+            });
+    }
+
+    function agregarDocumento() {
+        const id = document.getElementById('edit_id').value;
+        const idTipo = document.getElementById('select_tipo_documento').value;
+        const archivo = document.getElementById('input_documento').files[0];
+
+        if (!idTipo) return showAlert('Selecciona el tipo de documento.', 'info');
+        if (!archivo) return showAlert('Selecciona un archivo.', 'info');
+
+        const formData = new FormData();
+        formData.append('documento', archivo);
+        formData.append('id_document_type', idTipo);
+
+        fetch(`/api/empleados/${id}/documentos`, { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    showAlert(res.message, 'success');
+                    document.getElementById('select_tipo_documento').value = '';
+                    document.getElementById('input_documento').value = '';
+                    cargarDocumentos(id);
+                } else {
+                    showAlert(res.message || 'Ocurrió un error.', 'error');
+                }
+            })
+            .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    async function eliminarDocumento(idDocumento, idEmpleado) {
+        const ok = await showConfirm('¿Eliminar este documento? Esta acción no se puede deshacer.', {
+            type: 'danger', title: 'Eliminar documento', confirmText: 'Eliminar'
+        });
+        if (!ok) return;
+
+        fetch(`/api/empleados/documentos/${idDocumento}`, { method: 'DELETE' })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    showAlert(res.message, 'success');
+                    cargarDocumentos(idEmpleado);
+                } else {
+                    showAlert(res.message || 'Ocurrió un error.', 'error');
+                }
+            })
+            .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        cargarCatalogos();
+        cargarEmpleados();
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Préstamos</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>Registrar Préstamo</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver al menú</a>
+</div>
+
+<div class="panel" style="max-width:480px;margin:0 auto;">
+    <form id="formPrestamo">
+
+        <!-- Folio Autogenerado -->
+        <div class="field" style="margin-bottom:14px;">
+            <label for="folio">Folio de Control</label>
+            <input type="text" id="folio" name="folio" readonly placeholder="Cargando folio...">
+        </div>
+
+        <!-- Empleados de la DB -->
+        <div class="field" style="margin-bottom:14px;">
+            <label for="id_empleado">Colaborador / Empleado</label>
+            <select id="id_empleado" name="id_empleado" required>
+                <option value="" disabled selected>Cargando empleados...</option>
+            </select>
+        </div>
+
+        <!-- Monto Entero -->
+        <div class="field" style="margin-bottom:18px;">
+            <label for="monto_prestamo">Monto Solicitado ($)</label>
+            <input type="number" id="monto_prestamo" name="monto_prestamo" min="1" step="1" placeholder="Ej: 3500" required>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="actions">
+            <a href="dashboard.html" class="ghost" style="text-decoration:none;display:inline-flex;align-items:center;">Volver al Menú</a>
+            <button type="submit" class="primary">Guardar Registro</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const selectEmpleado = document.getElementById("id_empleado");
+        const inputFolio = document.getElementById("folio");
+        const form = document.getElementById("formPrestamo");
+
+        // 1. Cargar el Folio Automático al inicializar la pantalla
+        fetch('/api/prestamos/nuevo-folio')
+            .then(res => res.json())
+            .then(data => {
+                if(data.folio) inputFolio.value = data.folio;
+            })
+            .catch(err => console.error("Error cargando folio:", err));
+
+        // 2. Cargar los Empleados desde la base de datos
+fetch('/api/empleados')
+    .then(res => res.json())
+    .then(empleados => {
+        selectEmpleado.innerHTML = '<option value="" disabled selected>Selecciona un empleado...</option>';
+        empleados.forEach(emp => {
+            const option = document.createElement("option");
+            option.value = emp.ID_EMPLOYEE; // El ID se sigue guardando internamente aquí
+
+            // Ahora solo se mostrará el Nombre completo en la lista desplegable
+            option.textContent = emp.NAME;
+
+            selectEmpleado.appendChild(option);
+        });
+    })
+    .catch(err => {
+        console.error("Error cargando empleados:", err);
+        selectEmpleado.innerHTML = '<option value="" disabled>Error al cargar la lista</option>';
+    });
+
+        // 3. Enviar el Formulario por AJAX para no recargar la página completa
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+
+            // Intentamos recuperar el usuario del localStorage por si manejas inicios de sesión
+            const usuarioActivo = localStorage.getItem("username") || "Sistema";
+
+            const formData = {
+                folio: inputFolio.value,
+                id_empleado: selectEmpleado.value,
+                monto_prestamo: document.getElementById("monto_prestamo").value,
+                username: usuarioActivo
+            };
+
+            fetch('/api/prestamos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    const mensaje = res.unificado
+                        ? "El empleado ya tenía saldo pendiente, así que se unificó con el préstamo " + (res.folios_anteriores || []).join(', ') + ".\n" +
+                          "Saldo anterior: $" + Number(res.monto_restante_anterior).toFixed(2) + "\n" +
+                          "Préstamo nuevo: $" + Number(res.monto_nuevo).toFixed(2) + "\n" +
+                          "Nuevo total activo: $" + Number(res.monto_total).toFixed(2)
+                        : "¡Préstamo registrado correctamente!";
+
+                    showAlert(mensaje, "success", 3200).then(() => {
+                        window.location.href = "dashboard.html";
+                    });
+                } else {
+                    showAlert("Error: " + res.error, "error");
+                }
+            })
+            .catch(err => {
+                console.error("Error en el envío:", err);
+                showAlert("Hubo un problema de conexión al guardar el préstamo.", "error");
+            });
+        });
+    });
+</script>
+
+</body>
+</html>

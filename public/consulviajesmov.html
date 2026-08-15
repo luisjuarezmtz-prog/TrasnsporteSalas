@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Movimientos - Transportes Salas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/consulviajesmov.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h2>📊 Consulta de Movimientos de Viaje</h2>
+    
+    <div class="filters">
+        <div class="filter-group">
+            <label>Operador:</label>
+            <select id="filtroOperador">
+                <option value="">Todos los operadores</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Desde:</label>
+            <input type="date" id="fechaInicio">
+        </div>
+        <div class="filter-group">
+            <label>Hasta:</label>
+            <input type="date" id="fechaFin">
+        </div>
+        
+        <button class="btn-query" onclick="buscarMovimientos()">🔍 Consultar</button>
+        <button class="btn-clear" onclick="limpiarFiltros()">🧹 Limpiar</button>
+        <button class="btn-excel" onclick="exportarExcel()">📄 Excel</button>
+        <button class="btn-home" onclick="window.location.href='dashboard.html'">🏠 Inicio</button>
+    </div>
+
+    <table id="tablaMovimientos">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Operador</th>
+                <th>Tipo Movimiento</th>
+                <th>Fecha Mov.</th>
+                <th>Num Mov</th>
+                <th>Monto</th>
+                <th>Capturado por</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="7" style="text-align:center;">Cargando información...</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="pagination-container">
+        <button class="btn-pag" id="btnAnterior" onclick="cambiarPagina(-1)">Anterior</button>
+        <span id="infoPagina">Página 1 de 1</span>
+        <button class="btn-pag" id="btnSiguiente" onclick="cambiarPagina(1)">Siguiente</button>
+    </div>
+
+    <div class="total-box" id="totalMonto">Total: $0.00</div>
+</div>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    // VARIABLES GLOBALES PARA PAGINACIÓN
+    let datosCompletos = []; 
+    let paginaActual = 1;
+    const registrosPorPagina = 50;
+
+    // 1. Cargar catálogo de empleados y la tabla inicial
+    async function cargarDatosIniciales() {
+        try {
+            const res = await fetch('/api/empleados');
+            const emps = await res.json();
+            const select = document.getElementById('filtroOperador');
+            
+            select.innerHTML = '<option value="">Todos los operadores</option>';
+            emps.forEach(e => {
+                const opt = document.createElement('option');
+                opt.value = e.ID_EMPLOYEE;
+                opt.textContent = e.NAME;
+                select.appendChild(opt);
+            });
+
+            buscarMovimientos();
+        } catch (error) {
+            console.error("Error en la carga inicial:", error);
+        }
+    }
+
+    // 2. Función de búsqueda
+    async function buscarMovimientos() {
+        const op = document.getElementById('filtroOperador').value;
+        const inicio = document.getElementById('fechaInicio').value;
+        const fin = document.getElementById('fechaFin').value;
+        const tbody = document.querySelector('#tablaMovimientos tbody');
+        const messageDiv = document.getElementById('totalMonto');
+
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Buscando...</td></tr>';
+
+        const url = `/api/consultar-movimientos?operador=${op}&fechaInicio=${inicio}&fechaFin=${fin}`;
+        
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("Error en el servidor");
+            
+            // Guardamos todo el universo de datos devuelto por la API
+            datosCompletos = await res.json();
+            
+            // Reiniciamos a la primera página tras cada nueva búsqueda
+            paginaActual = 1; 
+
+            if (datosCompletos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No se encontraron registros</td></tr>';
+                messageDiv.innerText = `Total: $0.00`;
+                actualizarControlesPaginacion();
+                return;
+            }
+
+            // Calculamos y mostramos la suma general de todos los datos filtrados (no solo de la página actual)
+            let totalGeneral = datosCompletos.reduce((acc, m) => acc + (parseFloat(m.MONTO) || 0), 0);
+            messageDiv.innerText = `Total: $${totalGeneral.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+
+            // Renderizamos los primeros 50 registros
+            mostrarDatosPagina();
+            
+        } catch (e) {
+            console.error(e);
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:red;">Error de conexión</td></tr>';
+        }
+    }
+
+    // NUEVA FUNCIÓN: Renderiza únicamente los renglones correspondientes a la página activa
+    function mostrarDatosPagina() {
+        const tbody = document.querySelector('#tablaMovimientos tbody');
+        tbody.innerHTML = '';
+
+        // Segmentamos el array global usando un slice matemático
+        const inicioIndex = (paginaActual - 1) * registrosPorPagina;
+        const finIndex = inicioIndex + registrosPorPagina;
+        const datosPagina = datosCompletos.slice(inicioIndex, finIndex);
+
+        datosPagina.forEach(m => {
+            const monto = parseFloat(m.MONTO) || 0;
+            
+            tbody.innerHTML += `
+                <tr>
+                    <td>${escapeHtml(m.ID_TRAVEL_MOVEMENT)}</td>
+                    <td><b>${escapeHtml(m.OPERADOR)}</b></td>
+                    <td>${escapeHtml(m.TIPO_MOVIMIENTO)}</td>
+                    <td>${escapeHtml(m.FECHA)}</td>
+                    <td>${escapeHtml(m.FOLIO || '0')}</td>
+                    <td style="color: #28a745; font-weight: bold;">$${monto.toLocaleString('es-MX', {minimumFractionDigits: 2})}</td>
+                    <td style="font-size: 0.85em; color: #666;">${escapeHtml(m.REGISTRADO_POR || 'Sistema')}</td>
+                </tr>
+            `;
+        });
+
+        actualizarControlesPaginacion();
+    }
+
+    // NUEVA FUNCIÓN: Controla la habilitación de botones y texto dinámico
+    function actualizarControlesPaginacion() {
+        const totalPaginas = Math.ceil(datosCompletos.length / registrosPorPagina) || 1;
+        
+        document.getElementById('infoPagina').innerText = `Página ${paginaActual} de ${totalPaginas}`;
+        document.getElementById('btnAnterior').disabled = (paginaActual === 1);
+        document.getElementById('btnSiguiente').disabled = (paginaActual === totalPaginas);
+    }
+
+    // NUEVA FUNCIÓN: Se dispara al pulsar "Anterior" (-1) o "Siguiente" (+1)
+    function cambiarPagina(direccion) {
+        paginaActual += direccion;
+        mostrarDatosPagina();
+    }
+
+    // 3. Función para limpiar filtros
+    function limpiarFiltros() {
+        document.getElementById('filtroOperador').value = "";
+        document.getElementById('fechaInicio').value = "";
+        document.getElementById('fechaFin').value = "";
+        buscarMovimientos();
+    }
+
+    // 4. FUNCIÓN PARA EXPORTAR A EXCEL
+    // Nota: Esta función exportará ÚNICAMENTE lo que se esté viendo en la tabla en ese momento (la página actual).
+    function exportarExcel() {
+        const table = document.getElementById("tablaMovimientos");
+        
+        const rows = table.querySelectorAll('tbody tr');
+        if (rows.length === 1 && rows[0].innerText.includes("encontraron")) {
+            showAlert("No hay datos para exportar", "info");
+            return;
+        }
+
+        const wb = XLSX.utils.table_to_book(table, { sheet: "Movimientos" });
+        const nombreArchivo = `Reporte_Movimientos_${new Date().toLocaleDateString()}.xlsx`;
+        XLSX.writeFile(wb, nombreArchivo);
+    }
+
+    document.addEventListener('DOMContentLoaded', cargarDatosIniciales);
+</script>
+
+</body>
+</html>

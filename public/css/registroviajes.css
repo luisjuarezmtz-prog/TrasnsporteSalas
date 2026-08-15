@@ -1,0 +1,69 @@
+/* Mantenemos tus estilos originales */
+body {
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f4f7f9;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 20px 0;
+}
+.login-container {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    width: 90%;
+    max-width: 450px;
+    text-align: center;
+}
+.login-container img {
+    max-width: 120px;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+}
+h2 { color: #333; margin-bottom: 1rem; font-size: 20px; }
+
+.form-scroll {
+    max-height: 60vh;
+    overflow-y: auto;
+    text-align: left;
+    padding-right: 10px;
+    margin-bottom: 20px;
+}
+
+.form-scroll::-webkit-scrollbar { width: 6px; }
+.form-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+
+input, select {
+    width: 100%;
+    padding: 10px 12px;
+    margin: 5px 0 15px 0;
+    display: block;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-size: 14px;
+    background-color: #fafafa;
+}
+label {
+    font-weight: 600;
+    color: #555;
+    font-size: 13px;
+}
+button {
+    width: 100%;
+    background-color: #007bff;
+    color: white;
+    padding: 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    transition: 0.3s;
+}
+button:hover { background-color: #0056b3; }
+.btn-secondary { background-color: #6c757d; margin-top: 10px; }
+#message { margin-top: 15px; font-size: 14px; font-weight: bold; }

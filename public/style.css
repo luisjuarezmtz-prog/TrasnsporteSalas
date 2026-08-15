@@ -1,0 +1,265 @@
+:root{
+  --bg:#11161c; --panel:#161d26; --panel-2:#1c2530; --line:#2a3442;
+  --ink:#e7ecf2; --ink-dim:#8d99a8;
+  --amber:#e0a32e; --ok:#3fa66b; --warn:#d99a2b; --bad:#d65c5c;
+  --mono:'JetBrains Mono','SFMono-Regular',Consolas,monospace;
+  --sans:'Inter','Segoe UI',Arial,sans-serif;
+  color-scheme: dark;
+}
+
+/* ── Modo claro ───────────────────────────────────────────────
+   Se activa poniendo data-theme="light" en <html> (lo hace
+   js/theme.js, que también guarda la preferencia del usuario).
+   Como el resto del CSS del sitio usa estas mismas variables,
+   con solo redefinirlas aquí toda la app cambia de tema. */
+:root[data-theme="light"]{
+  --bg:#ffffff; --panel:#ffffff; --panel-2:#f1f3f5; --line:#d8dee6;
+  --ink:#14181f; --ink-dim:#6b7280;
+  --amber:#b7791f; --ok:#15803d; --warn:#b45309; --bad:#b91c1c;
+  color-scheme: light;
+}
+:root[data-theme="light"] .archivo-actual{ background:#eafaf0; border-color:#b8e6c5; }
+:root[data-theme="light"] .view-wrap{ background:#f5f6f8; }
+:root[data-theme="light"] #archivoActualNombre{ color:#15803d; }
+
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+  transition:background-color .15s ease, color .15s ease;}
+body{padding:24px;max-width:1200px;margin:0 auto;}
+
+/* ── Marca ─────────────────────────────────────────────────── */
+.brand{display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:2px solid var(--amber);padding-bottom:14px;margin-bottom:22px;}
+.brand h1{font-size:22px;letter-spacing:.04em;margin:0;text-transform:uppercase;}
+.brand .tag{font-family:var(--mono);color:var(--ink-dim);font-size:12px;}
+
+/* ── Paneles ────────────────────────────────────────────────── */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  padding:18px 20px;margin-bottom:20px;}
+.panel h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);
+  margin:0 0 14px 0;font-family:var(--mono);border-bottom:1px solid var(--line);padding-bottom:8px;}
+
+/* Acordeón */
+.panel.collapsible > h2{cursor:pointer;display:flex;justify-content:space-between;
+  align-items:center;user-select:none;}
+.panel.collapsible > h2::after{content:'▾';font-size:11px;color:var(--ink-dim);
+  transition:transform .15s ease;margin-left:10px;}
+.panel.collapsible.collapsed > h2{margin-bottom:0;border-bottom:none;padding-bottom:0;}
+.panel.collapsible.collapsed > h2::after{transform:rotate(-90deg);}
+.panel.collapsible.collapsed .panel-body{display:none;}
+
+/* ── Grids ─────────────────────────────────────────────────── */
+.grid{display:grid;gap:12px;}
+.grid-2{grid-template-columns:repeat(2,1fr);}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+@media(max-width:860px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr 1fr;}}
+@media(max-width:540px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}}
+
+/* ── Campos ────────────────────────────────────────────────── */
+label{font-size:11px;color:var(--ink-dim);text-transform:uppercase;
+  letter-spacing:.05em;display:block;margin-bottom:4px;}
+input[type=text],input[type=date],input[type=time],input[type=password],
+input[type=email],input[type=number],input[type=tel],input[type=search],
+textarea,select{
+  width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+  padding:8px 10px;border-radius:4px;font-family:var(--sans);font-size:13.5px;}
+textarea{resize:vertical;min-height:60px;}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--amber);outline-offset:1px;}
+input::placeholder,textarea::placeholder{color:var(--ink-dim);opacity:1;}
+.field{margin-bottom:0;}
+
+/* ── Upload de documentos ───────────────────────────────────── */
+.doc-upload-box{background:var(--panel-2);border:1px dashed var(--line);border-radius:6px;padding:16px;}
+.doc-label{font-size:13px;color:var(--amber);margin:0 0 10px 0;font-family:var(--mono);}
+.upload-btn{
+  display:inline-flex;align-items:center;cursor:pointer;background:var(--panel);
+  border:1px solid var(--line);border-radius:4px;padding:7px 14px;
+  font-size:12.5px;font-family:var(--mono);color:var(--ink);transition:filter .15s;
+}
+.upload-btn:hover{filter:brightness(1.2);}
+.archivo-nombre{font-size:12px;color:var(--ink-dim);margin-left:12px;vertical-align:middle;}
+.archivo-actual{margin-top:10px;display:flex;align-items:center;gap:12px;
+  background:#1a2a1a;border:1px solid #2a4a2a;border-radius:4px;padding:8px 12px;}
+#archivoActualNombre{font-size:12px;color:var(--ok);}
+.link-ver{font-size:12px;color:var(--amber);text-decoration:none;}
+.link-ver:hover{text-decoration:underline;}
+
+/* ── Vistas SVG ─────────────────────────────────────────────── */
+.views{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;}
+@media(max-width:760px){.views{grid-template-columns:1fr;}}
+.view-card{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:10px;}
+.view-card h3{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+  text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px 2px;}
+.view-wrap{position:relative;width:100%;border:1px dashed var(--line);border-radius:4px;
+  cursor:crosshair;overflow:hidden;background:#0d1116;}
+.view-wrap svg{display:block;width:100%;height:auto;}
+.mark{position:absolute;width:18px;height:18px;border-radius:50%;transform:translate(-50%,-50%);
+  display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;
+  color:#10141a;border:2px solid #10141a;cursor:pointer;}
+.mark.RASPONES{background:#e0a32e;} .mark.GOLPES{background:#d65c5c;}
+.mark.ABOLLADURAS{background:#6f9fd6;} .mark.PERFORACIONES{background:#b85cd6;}
+.mark.OTROS{background:#8d99a8;}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--ink-dim);}
+.legend span{display:inline-flex;align-items:center;gap:6px;}
+.legend i{width:11px;height:11px;border-radius:50%;display:inline-block;}
+
+/* ── Popover ────────────────────────────────────────────────── */
+.popover{position:absolute;z-index:30;background:var(--panel-2);border:1px solid var(--amber);
+  border-radius:6px;padding:10px;width:224px;font-size:12px;}
+.popover select,.popover input{margin-bottom:6px;}
+.popover .pop-actions{display:flex;justify-content:space-between;margin-top:4px;}
+.popover button{padding:6px 10px;font-size:11px;}
+
+/* ── Tablas ─────────────────────────────────────────────────── */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{border-bottom:1px solid var(--line);padding:7px 6px;text-align:left;}
+th{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;color:var(--ink-dim);letter-spacing:.04em;}
+.estado-group{display:flex;gap:14px;}
+.estado-group label.radio{display:flex;align-items:center;gap:5px;text-transform:none;
+  font-size:12.5px;color:var(--ink);margin:0;}
+input[type=radio]{accent-color:var(--amber);width:15px;height:15px;}
+input[type=text].obs-input{font-size:12.5px;padding:5px 8px;}
+
+/* Tabla de resultados de búsqueda */
+#tablaBusqueda tbody tr:hover{background:var(--panel-2);cursor:pointer;}
+#tablaBusqueda .btn-cargar-row{font-family:var(--mono);font-size:11px;padding:4px 8px;
+  border-radius:3px;background:var(--amber);color:#10141a;border:none;cursor:pointer;font-weight:700;}
+#tablaBusqueda .dictamen-apto{color:var(--ok);}
+#tablaBusqueda .dictamen-noapto{color:var(--bad);}
+
+/* ── Radio / dictamen ───────────────────────────────────────── */
+.radio-pill{display:flex;gap:10px;flex-wrap:wrap;}
+.radio-pill label{display:flex;gap:6px;align-items:center;text-transform:none;
+  font-size:12.5px;color:var(--ink);}
+.dictamen-row{display:flex;gap:24px;align-items:center;}
+.dictamen-row label{display:flex;gap:8px;align-items:center;text-transform:none;
+  font-size:14px;color:var(--ink);}
+
+/* ── Botones ────────────────────────────────────────────────── */
+.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px;}
+button{font-family:var(--mono);font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;
+  padding:11px 20px;border-radius:5px;border:1px solid var(--line);background:var(--panel-2);
+  color:var(--ink);cursor:pointer;}
+button.primary{background:var(--amber);color:#10141a;border-color:var(--amber);font-weight:700;}
+button.primary:hover,button:hover{filter:brightness(1.1);}
+button.ghost{background:transparent;}
+.hint{font-size:11px;color:var(--ink-dim);margin-top:6px;}
+
+/* ── Encabezado de panel con acciones a la derecha ─────────── */
+.panel-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;
+  border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:16px;}
+.panel-header h2{border-bottom:none;padding-bottom:0;margin-bottom:0;}
+
+/* ── Badges de estatus ──────────────────────────────────────── */
+.badge{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:20px;
+  border:1px solid transparent;white-space:nowrap;}
+.badge-ok{background:rgba(63,166,107,.15);color:var(--ok);border-color:rgba(63,166,107,.4);}
+.badge-warn{background:rgba(217,154,43,.15);color:var(--warn);border-color:rgba(217,154,43,.4);}
+.badge-bad{background:rgba(214,92,92,.15);color:var(--bad);border-color:rgba(214,92,92,.4);}
+.badge-info{background:rgba(224,163,46,.15);color:var(--amber);border-color:rgba(224,163,46,.4);}
+.badge-muted{background:rgba(141,153,168,.15);color:var(--ink-dim);border-color:rgba(141,153,168,.4);}
+
+/* ── Tarjetas resumen (KPIs) ──────────────────────────────────── */
+.stat-card{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:12px 16px;}
+.stat-card .stat-label{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;
+  color:var(--ink-dim);letter-spacing:.05em;margin-bottom:4px;}
+.stat-card .stat-value{font-size:20px;font-weight:700;color:var(--ink);}
+.stat-card .stat-value.amber{color:var(--amber);}
+.stat-card .stat-value.ok{color:var(--ok);}
+.stat-card .stat-value.bad{color:var(--bad);}
+
+/* ── Checkbox / radio nativos con acento ámbar ───────────────── */
+input[type=checkbox]{accent-color:var(--amber);width:16px;height:16px;cursor:pointer;}
+
+/* ── Enlaces ──────────────────────────────────────────────────── */
+a{color:var(--amber);}
+a.link-plain{color:var(--ink);text-decoration:none;}
+
+/* ── Modal (mismo comportamiento JS de Bootstrap: bootstrap.Modal,
+   pero con estética propia; solo se necesita bootstrap.bundle.min.js
+   para el togglear de clases, ya no su CSS) ─────────────────────── */
+.modal{position:fixed;top:0;left:0;z-index:1055;display:none;width:100%;height:100%;
+  overflow-x:hidden;overflow-y:auto;outline:0;}
+.modal.show{display:block;}
+.modal-dialog{position:relative;width:auto;margin:1.75rem auto;max-width:500px;pointer-events:none;}
+.modal.show .modal-dialog{pointer-events:auto;}
+.modal-dialog.modal-lg{max-width:800px;}
+.modal-dialog-scrollable{height:calc(100% - 3.5rem);}
+.modal-dialog-scrollable .modal-content{max-height:100%;overflow:hidden;}
+.modal-dialog-scrollable .modal-body{overflow-y:auto;}
+.modal-content{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 20px 60px rgba(0,0,0,.55);color:var(--ink);display:flex;flex-direction:column;width:100%;}
+.modal-header{display:flex;justify-content:space-between;align-items:center;
+  padding:14px 18px;border-bottom:1px solid var(--line);}
+.modal-header .modal-title{margin:0;font-family:var(--mono);font-size:13px;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--amber);display:flex;align-items:center;gap:8px;}
+.modal-body{padding:18px;}
+.modal-footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;
+  border-top:1px solid var(--line);flex-wrap:wrap;}
+.btn-close{background:transparent;border:none;color:var(--ink-dim);font-size:22px;
+  line-height:1;cursor:pointer;padding:0;}
+.btn-close::before{content:'\00d7';}
+.btn-close:hover{color:var(--ink);}
+.modal-backdrop{position:fixed;inset:0;z-index:1050;background:rgba(9,12,16,.7);}
+
+/* Overlay simple para modales manejados a mano (toggle de .hidden, sin
+   depender de bootstrap.Modal) */
+.modal-overlay{position:fixed;inset:0;z-index:1060;background:rgba(9,12,16,.7);
+  display:flex;align-items:center;justify-content:center;padding:20px;}
+.hidden{display:none !important;}
+
+/* ── Barra de progreso ────────────────────────────────────────── */
+.progress-track{width:100%;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:20px;height:8px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--amber);border-radius:20px;}
+.progress-fill.ok{background:var(--ok);}
+.progress-fill.bad{background:var(--bad);}
+
+.text-center{text-align:center;}
+.text-right{text-align:right;}
+
+/* ── Avisos inline (no confundir con el toast de ui-alert.js) ───── */
+.notice{border-radius:6px;padding:10px 14px;font-size:13px;margin-top:10px;}
+.notice-error{background:rgba(214,92,92,.12);border:1px solid rgba(214,92,92,.4);color:var(--bad);}
+.notice-ok{background:rgba(63,166,107,.12);border:1px solid rgba(63,166,107,.4);color:var(--ok);}
+
+/* ── Toast ──────────────────────────────────────────────────── */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--panel-2);
+  border:1px solid var(--amber);color:var(--ink);padding:12px 18px;border-radius:6px;
+  font-size:13px;display:none;z-index:50;font-family:var(--mono);}
+#toast.show{display:block;} #toast.error{border-color:var(--bad);}
+
+/* ── Hoja PDF (oculta, usada solo para html2canvas) ─────────── */
+.pdf-sheet{position:fixed;left:-99999px;top:0;width:1100px;background:#fff;color:#111;
+  font-family:Arial,sans-serif;padding:18px;}
+.pdf-sheet *{box-sizing:border-box;}
+.pdf-h1{font-size:18px;font-weight:800;text-transform:uppercase;
+  border-bottom:3px solid #c8941f;padding-bottom:8px;margin-bottom:10px;}
+.pdf-box{border:1px solid #999;border-radius:4px;padding:8px 10px;margin-bottom:10px;}
+.pdf-box h3{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#b8780f;
+  margin:0 0 8px 0;border-bottom:1px solid #ddd;padding-bottom:4px;}
+.pdf-grid{display:grid;gap:8px;}
+.pdf-grid-2{grid-template-columns:repeat(2,1fr);}
+.pdf-grid-3{grid-template-columns:repeat(3,1fr);}
+.pdf-grid-4{grid-template-columns:repeat(4,1fr);}
+.pdf-field{font-size:11px;}
+.pdf-field b{display:block;font-size:9px;color:#777;text-transform:uppercase;letter-spacing:.04em;}
+.pdf-views{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.pdf-view{border:1px solid #999;border-radius:4px;padding:6px;}
+.pdf-view h4{font-size:10px;text-transform:uppercase;color:#555;margin:0 0 4px 2px;}
+.pdf-view-canvas{position:relative;border:1px dashed #ccc;}
+.pdf-view-canvas svg{display:block;width:100%;height:auto;}
+.pdf-mark{position:absolute;width:14px;height:14px;border-radius:50%;
+  transform:translate(-50%,-50%);font-size:7px;font-weight:700;color:#111;
+  display:flex;align-items:center;justify-content:center;border:1.5px solid #111;}
+.pdf-legend{display:flex;gap:12px;font-size:9.5px;margin-top:6px;color:#444;}
+.pdf-legend span{display:inline-flex;align-items:center;gap:4px;}
+.pdf-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;}
+.pdf-sheet table{width:100%;border-collapse:collapse;font-size:11px;}
+.pdf-sheet th,.pdf-sheet td{border:1px solid #999;padding:3px 5px;text-align:left;}
+.pdf-sheet th{background:#eee;font-size:9.5px;text-transform:uppercase;}
+.pdf-checkbox{display:inline-flex;align-items:center;gap:5px;font-size:11px;margin-right:14px;}
+.pdf-checkbox .box{width:11px;height:11px;border:1.5px solid #333;display:inline-block;
+  text-align:center;line-height:10px;font-size:9px;}

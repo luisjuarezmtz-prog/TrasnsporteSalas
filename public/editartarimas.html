@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Registro de Tarimas - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>✏️ Editar Registro</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver al Inicio</a>
+</div>
+
+<div class="panel" style="max-width:480px;margin:0 auto;">
+    <div class="field" style="display:flex;gap:8px;align-items:end;margin-bottom:16px;">
+        <div style="flex:1;">
+            <label for="searchInvoice">Folio a editar</label>
+            <input type="text" id="searchInvoice" placeholder="Folio a editar (F-123...)">
+        </div>
+        <button type="button" class="ghost" onclick="buscarRegistro()">🔍</button>
+    </div>
+
+    <form id="formEdicion" style="display:none;">
+        <input type="hidden" id="editId">
+
+        <div class="field" style="margin-bottom:12px;">
+            <label>Folio (No editable)</label>
+            <input type="text" id="displayInvoice" readonly>
+        </div>
+
+        <div class="field" style="margin-bottom:12px;">
+            <label>CEDIS (No editable)</label>
+            <input type="text" id="displayCedi" readonly>
+        </div>
+
+        <div class="field" style="margin-bottom:12px;">
+            <label>Empleado / Operador</label>
+            <select id="editEmployeeId">
+                <option value="">Cargando empleados...</option>
+            </select>
+        </div>
+
+        <div class="field" style="margin-bottom:12px;">
+            <label>Núm. Tarimas</label>
+            <input type="number" readonly id="Tarimas" min="0" value="0">
+        </div>
+
+        <div class="field" id="grupoVales" style="margin-bottom:12px;">
+            <label>Núm. Vales (Actualizar)</label>
+            <input type="number" id="Vales" min="0" value="0">
+        </div>
+
+         <div class="field" id="grupoTarimasVales" style="margin-bottom:12px;">
+            <label>Núm. Tarimas/Vale</label>
+            <input type="number" id="tarimasVales" min="0" value="0">
+        </div>
+
+         <div class="field" id="grupoFaltantes" style="margin-bottom:18px;">
+            <label>Tarimas Faltantes</label>
+            <input readonly id="tarimasFaltantes" value="0" style="font-weight: bold; background: var(--panel-2);">
+        </div>
+
+        <button id="btnSave" type="submit" class="primary" style="width:100%;">💾 Guardar Cambios e Historial</button>
+    </form>
+
+    <div class="actions">
+        <button type="button" class="ghost" onclick="window.location.href='dashboard.html'">⬅️ Volver al Inicio</button>
+    </div>
+
+    <p id="statusMsg" class="hint" style="margin-top:10px;text-align:center;"></p>
+</div>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    // 1. CARGAR CATÁLOGO DE EMPLEADOS AL INICIAR
+    async function cargarEmpleados() {
+        const select = document.getElementById('editEmployeeId');
+        try {
+            const res = await fetch('/api/empleados');
+            const empleados = await res.json();
+
+            select.innerHTML = '<option value="">-- Seleccione un empleado --</option>';
+            empleados.forEach(emp => {
+                const option = document.createElement('option');
+                option.value = emp.ID_EMPLOYEE;
+                option.textContent = emp.NAME;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error("Error cargando empleados:", error);
+            select.innerHTML = '<option value="">Error al cargar</option>';
+        }
+    }
+
+    window.onload = cargarEmpleados;
+
+    // 2. FUNCIÓN DE CÁLCULO EN TIEMPO REAL
+    function calcularFaltantes() {
+        const inputFisicas = document.getElementById("Tarimas");       // Ejemplo: 53
+        const inputTarimasPorVale = document.getElementById("tarimasVales"); // Ejemplo: 35
+        const inputFaltantes = document.getElementById("tarimasFaltantes");
+
+        // Convertir valores a números enteros
+        const fisicas = parseInt(inputFisicas.value) || 0;
+        const tarimasPorVale = parseInt(inputTarimasPorVale.value) || 0;
+
+        // Nueva Operación: Tarimas Físicas menos Tarimas por Vale
+        let faltantes = fisicas - tarimasPorVale;
+
+        // Si el resultado da negativo (ej: hay 30 físicas y el vale es de 40), lo dejamos en 0
+        if (faltantes < 0) faltantes = 0;
+
+        // Renderizar resultado en el input (Dará 18 en tu ejemplo)
+        inputFaltantes.value = faltantes;
+
+        // Color visual condicional (Rojo si faltan, Verde si está en 0)
+        inputFaltantes.style.color = faltantes > 0 ? "var(--bad)" : "var(--ok)";
+    }
+
+    // 3. ASIGNAR EVENTOS CORRECTOS DE ESCUCHA DINÁMICA
+    document.addEventListener("DOMContentLoaded", () => {
+        // CORREGIDO: "Vales" y "tarimasVales" apuntan exactamente a los IDs del HTML
+        const inputCantidadVales = document.getElementById("Vales");
+        const inputTarimasPorVale = document.getElementById("tarimasVales");
+
+        inputCantidadVales.addEventListener("input", calcularFaltantes);
+        inputTarimasPorVale.addEventListener("input", calcularFaltantes);
+    });
+
+    // 4. BUSCAR REGISTRO EN LA API
+    async function buscarRegistro() {
+        const invoice = document.getElementById('searchInvoice').value;
+        const msg = document.getElementById('statusMsg');
+
+        if (!invoice) {
+            msg.style.color = 'var(--bad)';
+            msg.textContent = "⚠️ Por favor, ingresa un folio.";
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/obtener-registro-pallets?invoice=${invoice}`);
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('formEdicion').style.display = 'block';
+                document.getElementById('grupoVales').style.display = 'block';
+                document.getElementById('grupoTarimasVales').style.display = 'block';
+                document.getElementById('grupoFaltantes').style.display = 'block';
+                document.getElementById('btnSave').style.display = 'block';
+                document.getElementById('editId').value = data.id;
+
+                document.getElementById('displayInvoice').value = data.invoice;
+                document.getElementById('displayCedi').value = data.cedi_name || 'No definido en DB';
+                document.getElementById('editEmployeeId').value = data.id_employee;
+
+                 //alert(data.faltantes);
+                if(data.faltantes==null)
+                    document.getElementById('Tarimas').value = data.tarimas;
+                else if(data.faltantes==0)
+                {
+                    document.getElementById('Tarimas').value = data.tarimas;
+                    document.getElementById('grupoVales').style.display = 'none';
+                    document.getElementById('grupoTarimasVales').style.display = 'none';
+                    document.getElementById('grupoFaltantes').style.display = 'none';
+                    document.getElementById('btnSave').style.display = 'none';
+                }
+                else
+                    document.getElementById('Tarimas').value = data.faltantes;
+
+                document.getElementById('Vales').value = data.vales;
+                msg.textContent = "";
+
+                // Ejecución inicial automática al cargar datos
+                calcularFaltantes();
+            } else {
+                showAlert("No se encontró el registro.", "error");
+                document.getElementById('formEdicion').style.display = 'none';
+                msg.textContent = "";
+            }
+        } catch (e) {
+            console.error(e);
+            msg.style.color = 'var(--bad)';
+            msg.textContent = "🚫 Error al conectar con el servidor.";
+        }
+    }
+
+    // 5. GUARDAR ACTUALIZACIÓN
+    document.getElementById('formEdicion').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        // CORREGIDO: Extrae de forma dinámica el número calculado del cuadro visual
+        const faltantesCalculadas = parseInt(document.getElementById('tarimasFaltantes').value) || 0;
+
+        const payload = {
+            id_registration: document.getElementById('editId').value,
+            id_employee: document.getElementById('editEmployeeId').value,
+            num_tarimas: parseInt(document.getElementById('tarimasVales').value) || 0,
+            num_vales: parseInt(document.getElementById('Vales').value) || 0,
+            username: localStorage.getItem('username') || 'Admin',
+            faltantes: faltantesCalculadas // Enviamos el número calculado real al backend
+        };
+
+        if (!payload.id_employee) {
+            showAlert("Por favor selecciona un empleado.", "info");
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/actualizar-registro-pallets', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                showAlert("Registro actualizado y guardado en historial.", "success", 2200).then(() => {
+                    location.reload();
+                });
+            } else {
+                showAlert("Error al actualizar el registro.", "error");
+            }
+        } catch (error) {
+            console.error(error);
+            showAlert("Error de comunicación.", "error");
+        }
+    });
+</script>
+
+</body>
+</html>

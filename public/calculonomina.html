@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cálculo de Nómina - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>Generar Nueva Nómina</h1>
+    <a href="dashboard.html" class="link-plain tag">← Regresar a menú principal</a>
+</div>
+
+<div class="panel">
+    <form id="form-nomina">
+        <div class="grid grid-3" style="margin-bottom:16px;">
+            <div class="field">
+                <label>Fecha de Pago</label>
+                <input type="date" id="payment_date" required>
+            </div>
+            <div class="field">
+                <label>Inicio de Periodo</label>
+                <input type="date" id="period_start" required>
+            </div>
+            <div class="field">
+                <label>Fin de Periodo</label>
+                <input type="date" id="period_end" required>
+            </div>
+        </div>
+        <div class="text-center" style="margin-bottom:6px;">
+            <button type="button" onclick="validarPeriodo()" class="primary">🔍 Verificar y Cargar Empleados</button>
+        </div>
+    </form>
+
+    <div id="seccion-empleados" style="display: none;margin-top:20px;border-top:1px solid var(--line);padding-top:18px;">
+        <div class="panel-header">
+            <h2 style="border:none;padding:0;margin:0;">👥 Personal para Nómina</h2>
+            <span class="badge badge-info">Estatus Activo</span>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre Completo</th>
+                    <th class="text-center">Salario Bruto</th>
+                    <th class="text-center">Salario Neto</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-body"></tbody>
+        </table>
+        <div class="actions">
+            <button type="button" onclick="guardarNomina()" class="primary">💾 Finalizar y Guardar Nómina</button>
+        </div>
+    </div>
+
+    <div id="mensaje-error" class="notice notice-error" style="display: none;">
+        ⚠️ <span id="texto-error"></span>
+    </div>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:3000';
+
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    async function validarPeriodo() {
+        const pDate = document.getElementById('payment_date').value;
+        const pStart = document.getElementById('period_start').value;
+        const pEnd = document.getElementById('period_end').value;
+        const divEmpleados = document.getElementById('seccion-empleados');
+
+        if(!pDate || !pStart || !pEnd) {
+            showAlert("Por favor completa todas las fechas.", "info");
+            return;
+        }
+
+        document.getElementById('mensaje-error').style.display = 'none';
+        divEmpleados.style.display = 'block';
+        obtenerEmpleadosReales();
+    }
+
+    async function obtenerEmpleadosReales() {
+        const tbody = document.getElementById('tabla-body');
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center hint">Cargando datos del servidor...</td></tr>';
+
+        try {
+            // Nota: Usamos la ruta /empleados que ya tienes en tu server.js
+            const response = await fetch(`/api/empleados`);
+            const empleados = await response.json();
+
+            if (empleados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center hint">No hay empleados activos.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = "";
+            empleados.forEach(emp => {
+                // IMPORTANTE: Tu server.js envía "NAME" y "SALARY"
+                const nombreParaMostrar = emp.NAME || "Sin Nombre";
+                const salarioBase = parseFloat(emp.salario) || 0;
+
+                const fila = document.createElement('tr');
+                fila.setAttribute('data-id', emp.ID_EMPLOYEE);
+
+                // Guardamos el salario base en un atributo para el cálculo
+                fila.innerHTML = `
+                    <td class="text-center" style="font-family:var(--mono);">${escapeHtml(emp.ID_EMPLOYEE)}</td>
+                    <td>${escapeHtml(nombreParaMostrar)}</td>
+                    <td class="text-center bruto-celda" data-bruto="${salarioBase}">$${salarioBase.toFixed(2)}</td>
+                    <td class="text-center neto-celda" data-neto="${salarioBase}" style="font-weight:700;color:var(--ok);">$${salarioBase.toFixed(2)}</td>
+                `;
+                tbody.appendChild(fila);
+            });
+        } catch (error) {
+            console.error("Error:", error);
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color:var(--bad);">Error de conexión.</td></tr>';
+        }
+    }
+
+    function recalcular(input) {
+        const tr = input.closest('tr');
+        const base = parseFloat(tr.querySelector('.bruto-celda').getAttribute('data-bruto')) || 0;
+        const bono = parseFloat(tr.querySelector('.val-bono').value) || 0;
+        const caja = parseFloat(tr.querySelector('.val-caja').value) || 0;
+        const faltas = parseFloat(tr.querySelector('.val-faltas').value) || 0;
+
+        const neto = base + bono - caja - faltas;
+        const celdaNeto = tr.querySelector('.neto-celda');
+        celdaNeto.innerText = `$${neto.toFixed(2)}`;
+        celdaNeto.setAttribute('data-neto', neto);
+    }
+
+    async function guardarNomina() {
+        const pDate = document.getElementById('payment_date').value;
+        const pStart = document.getElementById('period_start').value;
+        const pEnd = document.getElementById('period_end').value;
+        const filas = document.querySelectorAll('#tabla-body tr');
+        const nominaData = [];
+
+        filas.forEach(fila => {
+            const id = fila.getAttribute('data-id');
+            if(!id) return;
+
+            nominaData.push({
+                id_employee: id,
+                payment_date: pDate,
+                period_start: pStart,
+                period_end: pEnd,
+                gross_salary: parseFloat(fila.querySelector('.bruto-celda').getAttribute('data-bruto')) || 0,
+                net_salary: parseFloat(fila.querySelector('.neto-celda').getAttribute('data-neto')) || 0
+            });
+        });
+
+        if (nominaData.length === 0) return showAlert("No hay datos para guardar.", "info");
+
+        try {
+            const response = await fetch(`/api/guardar-nomina`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ detalle: nominaData })
+            });
+
+            const res = await response.json();
+            if(res.success) {
+                showAlert("Nómina guardada exitosamente en la tabla 'payroll'.", "success", 3000).then(() => {
+                    window.location.href = "dashboard.html";
+                });
+            } else {
+                showAlert("Error: " + res.message, "error");
+            }
+        } catch (error) {
+            showAlert("Error de conexión al guardar.", "error");
+        }
+    }
+</script>
+
+</body>
+</html>

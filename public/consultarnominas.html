@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultar Nóminas - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+    <div class="brand">
+        <h1>Resumen de Nóminas Generadas</h1>
+        <a href="dashboard.html" class="link-plain tag">← Volver al Dashboard</a>
+    </div>
+    <p class="hint" style="margin-top:-14px;margin-bottom:20px;">Métricas consolidadas y procesadas dinámicamente.</p>
+
+    <div class="panel">
+        <div class="panel-header">
+            <h2 style="border:none;padding:0;margin:0;">Filtros</h2>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span class="hint" style="margin:0;">Pago:</span>
+                <input type="date" id="fechaPagoInicio" title="Fecha de pago inicial" style="width:auto;">
+                <span class="hint" style="margin:0;">a</span>
+                <input type="date" id="fechaPagoFin" title="Fecha de pago final" style="width:auto;">
+                <button onclick="cargarYRenderizar()" class="primary">🔎 Filtrar</button>
+            </div>
+        </div>
+
+        <table id="tabla-nominas">
+            <thead>
+                <tr>
+                    <th>Folio Agrupado</th>
+                    <th>Fecha de Pago</th>
+                    <th>Fecha Inicio</th>
+                    <th>Fecha Fin</th>
+                    <th class="text-center">Nº de Empleados</th>
+                    <th class="text-right">Monto Total</th>
+                    <th class="text-center">Estado</th>
+                </tr>
+            </thead>
+            <tbody id="payroll-rows">
+                <tr>
+                    <td colspan="7" class="text-center hint">Conectando al servidor y obteniendo nóminas reales...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- LÓGICA CONECTADA AL SERVIDOR REAL -->
+    <script>
+        // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
+        // 1. Función adaptada para leer los totales directos calculados por SQL (COUNT y SUM)
+        function procesarYAgruparPayroll(registros) {
+            const agrupado = {};
+
+            registros.forEach(row => {
+                const folio = row.FOLIO || row.folio || 'SIN-FOLIO';
+                const payment_date = row.PAYMENT_DATE || row.payment_date || 'N/A';
+                const period_start = row.PERIOD_START || row.period_start || 'N/A';
+                const period_end = row.PERIOD_END || row.period_end || 'N/A';
+
+                const total_empleados = parseInt(row.TOTAL_EMPLEADOS || row.total_empleados || 0);
+                const monto_total = parseFloat(row.MONTO_TOTAL || row.monto_total || row.NET_SALARY || row.net_salary || 0);
+                const estatus_general = row.ESTATUS_GENERAL || row.estatus_general || 'GENERADA';
+
+                if (!agrupado[folio]) {
+                    agrupado[folio] = {
+                        folio: folio,
+                        payment_date: payment_date,
+                        period_start: period_start,
+                        period_end: period_end,
+                        total_empleados: total_empleados,
+                        monto_total: monto_total,
+                        estatus_general: estatus_general
+                    };
+                } else {
+                    agrupado[folio].monto_total += monto_total;
+                }
+            });
+
+            return Object.values(agrupado);
+        }
+
+        // 2. Función principal para traer la información real mediante Fetch API
+        async function cargarYRenderizar() {
+            const container = document.getElementById('payroll-rows');
+
+            // Capturar filtros de fecha de pago modificados
+            const fechaInicio = document.getElementById('fechaPagoInicio').value;
+            const fechaFin = document.getElementById('fechaPagoFin').value;
+
+            // Construcción de la URL de tu API pasándole las fechas seleccionadas
+            let url = '/api/consultar-nomina-historial';
+            if (fechaInicio && fechaFin) {
+                url += `?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Error en la respuesta del servidor');
+
+                const datosDesdeServidor = await response.json();
+
+                if (!datosDesdeServidor || datosDesdeServidor.length === 0) {
+                    container.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center hint">
+                                No se encontraron registros de nóminas para el rango de fechas seleccionado.
+                            </td>
+                        </tr>`;
+                    return;
+                }
+
+                const datosAgrupados = procesarYAgruparPayroll(datosDesdeServidor);
+                container.innerHTML = '';
+
+                datosAgrupados.forEach(item => {
+                    const esPagada = item.estatus_general === 'PAGADA';
+                    const badgeEstado = esPagada
+                        ? `<span class="badge badge-ok">Pagada</span>`
+                        : `<span class="badge badge-warn">Generada</span>`;
+
+                    const fila = `
+                        <tr>
+                            <td style="font-family:var(--mono);font-weight:700;">${escapeHtml(item.folio)}</td>
+                            <td>${escapeHtml(item.payment_date)}</td>
+                            <td>${escapeHtml(item.period_start)}</td>
+                            <td>${escapeHtml(item.period_end)}</td>
+                            <td class="text-center"><span class="badge badge-info">${escapeHtml(item.total_empleados)} Empleados</span></td>
+                            <td class="text-right" style="font-weight:700;font-family:var(--mono);">
+                                $${item.monto_total.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td class="text-center">${badgeEstado}</td>
+                        </tr>
+                    `;
+                    container.innerHTML += fila;
+                });
+
+            } catch (error) {
+                console.error("Error al cargar nóminas:", error);
+                container.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center" style="color:var(--bad);">
+                            No se pudo obtener la información del servidor. Asegúrate de que Node.js esté corriendo.
+                        </td>
+                    </tr>`;
+            }
+        }
+
+        // Ejecutar la petición automáticamente
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarYRenderizar();
+        });
+    </script>
+</body>
+</html>

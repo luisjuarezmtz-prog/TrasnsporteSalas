@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control - Sistema</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>Transportes Salas</h2>
+        
+        <button class="tab-btn active" onclick="openTab(event, 'inicio')">🏠 Inicio</button>    
+        
+        <div id="grupo-viajes">
+            <button class="dropdown-btn">📊 Gestión de Viajes</button>
+            <div class="dropdown-container">
+                <button class="tab-btn" id="sub-registroviajes" onclick="window.location.href='registroviajes.html'">📝 Registro Viajes</button>
+                <button class="tab-btn" id="sub-consultarviajes" onclick="window.location.href='consultarviajes.html'">🔍 Consulta Viajes</button>
+                <button class="tab-btn" id="sub-agendaviajes" onclick="window.location.href='agendaviajes.html'">📅 Agenda Viajes</button>
+                <button class="tab-btn" id="sub-regmovviajes" onclick="window.location.href='regmovviajes.html'">🌎 Reg. Movimientos</button>
+                <button class="tab-btn" id="sub-consulviajesmov" onclick="window.location.href='consulviajesmov.html'">👁️ Consulta Movi</button>
+            </div>
+        </div>
+
+        <div id="grupo-tarimas">
+            <button class="dropdown-btn">🪵 Control de Tarimas</button>
+            <div class="dropdown-container">
+                <button class="tab-btn" id="sub-regtarimas" onclick="window.location.href='regtarimas.html'">➕ Registro Tarimas</button>
+                <button class="tab-btn" id="sub-editartarimas" onclick="window.location.href='editartarimas.html'">✏️ Editar Tarimas</button>
+                <button class="tab-btn" id="sub-consultatarimas" onclick="window.location.href='consultatarimas.html'">📋 Consulta Tarimas</button>
+            </div>
+        </div>
+
+        <div id="grupo-empleados">
+            <button class="dropdown-btn">🧑‍💼 Empleados</button>
+            <div class="dropdown-container">
+                <button class="tab-btn" id="sub-empleados" onclick="window.location.href='empleados.html'">🧑‍💼 Alta / Baja / Cambio</button>
+            </div>
+        </div>
+
+        <div id="grupo-nomina">
+            <button class="dropdown-btn">💵 Nómina y Préstamos</button>
+            <div class="dropdown-container">
+                <button class="tab-btn" id="sub-calculonomina" onclick="window.location.href='calculonomina.html'">⚙️ Generar Nómina</button>
+                <button class="tab-btn" id="sub-consultarnominas" onclick="window.location.href='consultarnominas.html'">💰 Consultar Nóminas</button>
+                <button class="tab-btn" id="sub-revisarnomina" onclick="window.location.href='revisarnomina.html'">🧮 Revisar Nómina</button>
+                <button class="tab-btn" id="sub-autorizarnomina" onclick="window.location.href='autorizarnomina.html'">✅ Autorización Nómina</button>
+                <button class="tab-btn" id="sub-regprestamos" onclick="window.location.href='regprestamos.html'">🪙 Reg. Préstamos</button>
+                <button class="tab-btn" id="sub-consultarprestamos" onclick="window.location.href='consultarprestamos.html'">💸 Consultar Préstamos</button>
+                <button class="tab-btn" id="sub-cajaahorro" onclick="window.location.href='cajaahorro.html'">💸 Caja Ahorro</button>
+            </div>
+        </div>
+
+        <div id="grupo-cxc">
+            <button class="dropdown-btn">🧾 Cuentas por Cobrar</button>
+            <div class="dropdown-container">
+                <button class="tab-btn" id="sub-cxcmovimientos" onclick="window.location.href='cxcmovimientos.html'">🚚 Movimiento de Viajes</button>
+                <button class="tab-btn" id="sub-cxcfacturas" onclick="window.location.href='cxcfacturas.html'">🧾 Factura CXC</button>
+                <button class="tab-btn" id="sub-proveedores" onclick="window.location.href='proveedores.html'">🏢 Proveedores</button>
+            </div>
+        </div>
+
+        <div id="grupo-cajas">
+            <button class="dropdown-btn">🚚 Flotilla</button>
+            <div class="dropdown-container">
+                <button class="tab-btn" id="sub-checkcajas" onclick="window.location.href='checkcajas.html'">📦 Registro Cajas</button>
+            </div>
+        </div>
+
+        <div id="grupo-admin">
+            <button class="dropdown-btn">⚙️ Administración</button>
+            <div class="dropdown-container">
+                <button class="tab-btn" id="sub-usuarios" onclick="window.location.href='usuarios.html'">👤 Usuarios y Roles</button>
+                <button class="tab-btn" id="sub-catalogos" onclick="window.location.href='catalogos.html'">📚 Catálogos del Sistema</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>Bienvenido, <span id="userName">Usuario</span></h1>
+            <button class="logout-btn" onclick="logout()">Cerrar Sesión</button>
+        </div>
+
+        <div id="inicio" class="tab-content active">
+            <div class="panel">
+                <h2>Resumen General</h2>
+                <p class="hint" style="font-size:13px;">Este es el panel principal de tu aplicación.</p>
+            </div>
+        </div>
+
+        <div id="usuarios" class="tab-content">
+            <div class="panel">
+                <h2>Gestión de Usuarios</h2>
+                <p class="hint" style="font-size:13px;">Aquí puedes ver y editar los usuarios con acceso al sistema.</p>
+            </div>
+        </div>
+
+        <div id="ajustes" class="tab-content">
+            <div class="panel">
+                <h2>Configuración</h2>
+                <p class="hint" style="font-size:13px;">Modifica los parámetros generales de tu cuenta.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- VALIDACIÓN DE PERMISOS POR ROL ---
+        // Antes esto era un chequeo fijo en código (`if (rol === '6') {...}`)
+        // que solo contemplaba un rol especial. Ahora los permisos se
+        // consultan en la base de datos (tablas c_roles / c_system_modules /
+        // role_module_permissions, administrables desde usuarios.html) y se
+        // aplican dinámicamente a cualquier grupo del menú.
+        const userRol = localStorage.getItem('rol');
+
+        function aplicarPermisosMenu() {
+            if (!userRol) return; // sin rol guardado: no se oculta nada por seguridad de UX
+
+            fetch(`/api/mis-permisos?rol=${encodeURIComponent(userRol)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) return;
+                    const modulosPermitidos = new Set(data.modulos || []);
+                    const submodulosPermitidos = new Set(data.submodulos || []);
+
+                    // Todos los grupos del sidebar que están sujetos a permisos
+                    // (deben coincidir con MODULE_KEY en c_system_modules).
+                    const grupos = ['grupo-viajes', 'grupo-tarimas', 'grupo-empleados', 'grupo-nomina', 'grupo-cxc', 'grupo-cajas', 'grupo-admin'];
+
+                    grupos.forEach(idGrupo => {
+                        const el = document.getElementById(idGrupo);
+                        if (!el) return;
+                        el.style.display = modulosPermitidos.has(idGrupo) ? '' : 'none';
+                    });
+
+                    // Dentro de cada grupo visible, se ocultan además las opciones
+                    // (submódulos) que el rol no tiene permitidas de forma individual
+                    // (deben coincidir con SUBMODULE_KEY en c_system_submodules).
+                    document.querySelectorAll('[id^="sub-"]').forEach(el => {
+                        const key = el.id.replace('sub-', '');
+                        el.style.display = submodulosPermitidos.has(key) ? '' : 'none';
+                    });
+                })
+                .catch(err => console.error('Error al consultar permisos del rol:', err));
+        }
+
+        aplicarPermisosMenu();
+
+        // Lógica para abrir y cerrar los submenús desplegables
+        const dropdowns = document.getElementsByClassName("dropdown-btn");
+        for (let i = 0; i < dropdowns.length; i++) {
+            dropdowns[i].addEventListener("click", function() {
+                this.classList.toggle("active-menu");
+                const container = this.nextElementSibling;
+                if (container.style.display === "block") {
+                    container.style.display = "none";
+                } else {
+                    container.style.display = "block";
+                }
+            });
+        }
+
+        // Tu función original para las pestañas locales
+        function openTab(evt, tabName) {
+            const contents = document.getElementsByClassName("tab-content");
+            for (let content of contents) {
+                content.classList.remove("active");
+            }
+
+            const buttons = document.getElementsByClassName("tab-btn");
+            for (let btn of buttons) {
+                btn.classList.remove("active");
+            }
+
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+        }
+
+        document.getElementById('userName').innerText = localStorage.getItem('username') || 'Invitado';
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

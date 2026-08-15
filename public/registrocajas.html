@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Cajas</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/registrocajas.css">
+</head>
+<body class="bg-light">
+
+    <div class="container mt-4 mb-5">
+        
+        <!-- Botón Regresar a Inicio -->
+        <div class="row btn-back">
+            <div class="col">
+                <a href="dashboard.html" class="btn btn-outline-secondary btn-sm">
+                    ← Regresar a Inicio
+                </a>
+            </div>
+        </div>
+
+        <!-- Navegación de Pestañas -->
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="registro-tab" data-bs-toggle="tab" data-bs-target="#registro" type="button" role="tab">Registro de Caja</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="observaciones-tab" data-bs-toggle="tab" data-bs-target="#observaciones-pane" type="button" role="tab">Observaciones</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="consultas-tab" data-bs-toggle="tab" data-bs-target="#consultas" type="button" role="tab">Consultas</button>
+            </li>
+        </ul>
+
+        <!-- Contenido de las Pestañas -->
+        <div class="tab-content bg-white p-4 border border-top-0 shadow-sm" id="myTabContent">
+            
+            <!-- PESTAÑA 1: REGISTRO -->
+            <div class="tab-pane fade show active" id="registro" role="tabpanel">
+                <form id="formRegistro" enctype="multipart/form-data">
+                    
+                    <h5 class="section-title">Datos Fiscales y Propietario</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Razón Social</label>
+                            <input type="text" name="RAZON_SOCIAL" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">RFC (Reg. Federal)</label>
+                            <input type="text" name="REG_FEDERAL" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Propietario Vehículo</label>
+                            <input type="text" name="PROPIETARIO_VEHICULO" class="form-control" maxlength="60">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Calle</label>
+                            <input type="text" name="CALLE" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Número</label>
+                            <input type="text" name="NUMERO" class="form-control" maxlength="30">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Colonia</label>
+                            <input type="text" name="COLONIA" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">C.P.</label>
+                            <input type="number" name="COD_POSTAL" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Domicilio Fiscal</label>
+                            <input type="text" name="DOMICILIO_FISCAL" class="form-control" maxlength="50">
+                        </div>
+                    </div>
+
+                    <h5 class="section-title">Especificaciones Técnicas</h5>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Placas</label>
+                            <input type="text" name="PLACAS" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">NIV / Serie</label>
+                            <input type="text" name="NIV" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Modalidad</label>
+                            <input type="text" name="MODALIDAD" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Motor</label>
+                            <input type="text" name="MOTOR" class="form-control" maxlength="50">
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label">Marca de Caja</label>
+                            <select name="ID_MARCA_CAJA" class="form-select">
+                                <option value="" selected disabled>Seleccione marca...</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label">Modelo (Año)</label>
+                            <input type="number" name="MODELO" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Clase</label>
+                            <input type="text" name="CLASE" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Combustible</label>
+                            <input type="text" name="COMBUSTIBLE" class="form-control" maxlength="50">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo de Caja</label>
+                            <select name="ID_TIPO_CAJA" class="form-select">
+                                <option value="" selected disabled>Seleccione tipo...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <h5 class="section-title">Capacidades y Dimensiones</h5>
+                    <div class="row g-3">
+                        <div class="col-md-2">
+                            <label class="form-label">Peso Vehicular</label>
+                            <input type="text" name="PESO_VEHICULAR" class="form-control" maxlength="30">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Ejes</label>
+                            <input type="number" name="NUM_EJES" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Llantas</label>
+                            <input type="number" name="NUM_LLANTAS" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Litros</label>
+                            <input type="number" name="LITROS" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Toneladas</label>
+                            <input type="number" name="TONELADAS" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Personas</label>
+                            <input type="number" name="PERSONAS" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Alto (m)</label>
+                            <input type="number" step="0.01" name="ALTO" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Ancho (m)</label>
+                            <input type="number" step="0.01" name="ANCHO" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Largo (m)</label>
+                            <input type="number" step="0.01" name="LARGO" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo Suspensión</label>
+                            <input type="text" name="TIPO_SUSPENSION" class="form-control" maxlength="50">
+                        </div>
+                    </div>
+
+                    <h5 class="section-title">Ejes y Trámite</h5>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Eje Direccional</label>
+                            <input type="text" name="EJE_DIRECCIONAL" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Eje Motriz</label>
+                            <input type="text" name="EJE_MOTRIZ" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Eje Arrastre</label>
+                            <input type="text" name="EJE_ARRASTRE" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Permiso Ruta</label>
+                            <input type="text" name="PERMISO_RUTA" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Folio</label>
+                            <input type="text" name="FOLIO" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Folio Serie</label>
+                            <input type="text" name="FOLIO_SERIE" class="form-control" maxlength="100">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Fecha Límite Suspensión</label>
+                            <input type="text" name="FECHA_LIMITE_SUSPENSION" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Trámite</label>
+                            <input type="text" name="TRAMITE" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Lugar Expedición</label>
+                            <input type="text" name="LUGAR_EXPEDICION" class="form-control" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Fecha Expedición</label>
+                            <input type="date" name="FECHA_EXPEDICION" class="form-control">
+                        </div>
+                    </div>
+
+                    <!-- DOCUMENTACIÓN DIGITAL AL FINAL -->
+                    <h5 class="section-title">Documentación Digital</h5>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-12">
+                            <div class="upload-box">
+                                <label class="form-label text-primary">Subir Tarjeta de Circulación (PDF o Imagen)</label>
+                                <input type="file" name="TARJETA_CIRCULACION_FILE" class="form-control" accept=".pdf, image/*">
+                                <div class="form-text">Formatos permitidos: PDF, JPG, PNG.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 text-center">
+                        <button type="submit" class="btn btn-primary btn-lg px-5">Guardar Registro</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- PESTAÑA 2: OBSERVACIONES -->
+            <div class="tab-pane fade" id="observaciones-pane" role="tabpanel">
+                <h5 class="section-title">Notas y Observaciones Adicionales</h5>
+                <div class="mt-3">
+                    <label class="form-label">Escriba aquí cualquier detalle relevante sobre la unidad o el registro:</label>
+                    <textarea name="OBSERVACIONES" form="formRegistro" class="form-control" rows="10" maxlength="1000" placeholder="Ingrese las observaciones aquí..."></textarea>
+                </div>
+            </div>
+
+            <!-- PESTAÑA 3: CONSULTAS -->
+            <div class="tab-pane fade" id="consultas" role="tabpanel">
+                <h4 class="mt-3">Sección de Consultas</h4>
+                <p>Búsqueda y visualización de registros existentes en el sistema.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

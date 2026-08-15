@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factura CXC - Cuentas por Cobrar</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>🧾 Factura CXC</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<!-- ══════════════════════ GENERAR FACTURA ══════════════════════ -->
+<div class="panel">
+    <h2>Generar Factura</h2>
+    <p class="hint" style="font-size:13px;margin-bottom:16px;">
+        Combina 3 categorías de costo: Movimientos de viaje (rango de fechas), y Locales / Foráneos
+        (fecha de pago general de compras). Calcula primero para revisar el desglose, y luego guarda
+        la factura para dejarla en el historial.
+    </p>
+
+    <div class="grid grid-3" style="margin-bottom:14px;">
+        <div class="field">
+            <label>Fecha Inicio (Movimientos)</label>
+            <input type="date" id="fechaInicioMov">
+        </div>
+        <div class="field">
+            <label>Fecha Fin (Movimientos)</label>
+            <input type="date" id="fechaFinMov">
+        </div>
+        <div class="field">
+            <label>Fecha de Pago General (Locales/Foráneos)</label>
+            <input type="date" id="fechaPago">
+        </div>
+    </div>
+
+    <div class="actions" style="margin-bottom:18px;">
+        <button class="primary" onclick="calcularFactura()">🧮 Calcular</button>
+        <button class="ghost" id="btnGuardarFactura" style="display:none;" onclick="guardarFactura()">💾 Guardar Factura</button>
+    </div>
+
+    <div id="contenedorDesglose" style="display:none;">
+        <div class="grid grid-3" style="margin-bottom:14px;">
+            <div class="stat-card">
+                <div class="stat-label">Movimientos</div>
+                <div class="stat-value" id="statMovNumero">0</div>
+                <div class="hint" id="statMovCosto">$0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Locales</div>
+                <div class="stat-value" id="statLocNumero">0</div>
+                <div class="hint" id="statLocCosto">$0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Foráneos</div>
+                <div class="stat-value" id="statForNumero">0</div>
+                <div class="hint" id="statForCosto">$0.00</div>
+            </div>
+        </div>
+
+        <div id="contenedorForaneosDetalle" style="margin-bottom:14px;">
+            <p class="hint" style="text-transform:uppercase;font-family:var(--mono);color:var(--ink);margin-bottom:8px;">Desglose de Foráneos por CEDI</p>
+            <table>
+                <thead>
+                    <tr><th>CEDI</th><th>Número</th><th>Costo</th></tr>
+                </thead>
+                <tbody id="tablaForaneosCuerpo"></tbody>
+            </table>
+        </div>
+
+        <div class="grid grid-4">
+            <div class="stat-card">
+                <div class="stat-label">Subtotal</div>
+                <div class="stat-value" id="statSubtotal">$0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">IVA (16%)</div>
+                <div class="stat-value" id="statIva">$0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">IVA Retenido (4%)</div>
+                <div class="stat-value" id="statIvaRetenido">$0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Factura</div>
+                <div class="stat-value ok" id="statTotalFactura">$0.00</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════ HISTORIAL DE FACTURAS ══════════════════════ -->
+<div class="panel">
+    <div class="panel-header">
+        <h2>📋 Historial de Facturas</h2>
+        <button class="ghost" onclick="cargarHistorial()">🔄 Actualizar</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Folio</th>
+                <th>Rango Movimientos</th>
+                <th>Fecha Pago</th>
+                <th>Total Factura</th>
+                <th>Estatus</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tablaHistorialCuerpo">
+            <tr><td colspan="6" class="text-center hint">Cargando historial...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- MODAL DETALLE DE FACTURA -->
+<div class="modal fade" id="modalDetalle" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🧾 Detalle de Factura</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body" id="cuerpoModalDetalle">
+                <p class="hint">Cargando...</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/ui-alert.js"></script>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    const modalDetalle = new bootstrap.Modal(document.getElementById('modalDetalle'));
+    let ultimoCalculo = null;
+
+    function formatearMoneda(valor) {
+        return `$${parseFloat(valor || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function obtenerFechasFormulario() {
+        return {
+            fecha_inicio_mov: document.getElementById('fechaInicioMov').value,
+            fecha_fin_mov: document.getElementById('fechaFinMov').value,
+            fecha_pago: document.getElementById('fechaPago').value
+        };
+    }
+
+    function pintarDesglose(data) {
+        document.getElementById('statMovNumero').textContent = data.movimientos.numero;
+        document.getElementById('statMovCosto').textContent = formatearMoneda(data.movimientos.costo);
+        document.getElementById('statLocNumero').textContent = data.locales.numero;
+        document.getElementById('statLocCosto').textContent = formatearMoneda(data.locales.costo);
+        document.getElementById('statForNumero').textContent = data.foraneos.totales.numero;
+        document.getElementById('statForCosto').textContent = formatearMoneda(data.foraneos.totales.costo);
+
+        const tbody = document.getElementById('tablaForaneosCuerpo');
+        tbody.innerHTML = '';
+        if (data.foraneos.detalle.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center hint">Sin foráneos en este rango.</td></tr>';
+        } else {
+            data.foraneos.detalle.forEach(d => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${escapeHtml(d.cedi_name)}</td>
+                        <td>${escapeHtml(d.numero)}</td>
+                        <td>${formatearMoneda(d.costo)}</td>
+                    </tr>`;
+            });
+        }
+
+        document.getElementById('statSubtotal').textContent = formatearMoneda(data.subtotal);
+        document.getElementById('statIva').textContent = formatearMoneda(data.iva);
+        document.getElementById('statIvaRetenido').textContent = formatearMoneda(data.iva_retenido);
+        document.getElementById('statTotalFactura').textContent = formatearMoneda(data.total_factura);
+
+        document.getElementById('contenedorDesglose').style.display = 'block';
+    }
+
+    function calcularFactura() {
+        const fechas = obtenerFechasFormulario();
+        if (!fechas.fecha_inicio_mov || !fechas.fecha_fin_mov || !fechas.fecha_pago) {
+            return showAlert('Completa las 3 fechas para calcular la factura.', 'info');
+        }
+        if (fechas.fecha_inicio_mov > fechas.fecha_fin_mov) {
+            return showAlert('La fecha inicio de movimientos no puede ser posterior a la fecha fin.', 'info');
+        }
+
+        document.getElementById('btnGuardarFactura').style.display = 'none';
+
+        fetch('/api/cxc/calcular', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(fechas)
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (!res.success) return showAlert(res.message || 'Ocurrió un error.', 'error');
+            ultimoCalculo = fechas;
+            pintarDesglose(res.data);
+            document.getElementById('btnGuardarFactura').style.display = 'inline-block';
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    async function guardarFactura() {
+        if (!ultimoCalculo) return;
+
+        const ok = await showConfirm('¿Guardar esta factura en el historial? El monto se recalculará en el servidor antes de guardarse.', {
+            title: 'Guardar factura', confirmText: 'Guardar'
+        });
+        if (!ok) return;
+
+        fetch('/api/cxc/facturas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...ultimoCalculo, username: localStorage.getItem('username') || 'Sistema' })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (!res.success) return showAlert(res.message || 'Ocurrió un error.', 'error');
+            showAlert(res.message, 'success');
+            document.getElementById('btnGuardarFactura').style.display = 'none';
+            cargarHistorial();
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    function badgeEstatus(idStatus) {
+        const status = parseInt(idStatus);
+        if (status === 2) return '<span class="badge badge-ok">Pagada</span>';
+        if (status === 3) return '<span class="badge badge-bad">Cancelada</span>';
+        return '<span class="badge badge-warn">Generada</span>';
+    }
+
+    function formatearFecha(fechaIso) {
+        if (!fechaIso) return '—';
+        const f = new Date(fechaIso);
+        return f.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    }
+
+    function cargarHistorial() {
+        const tbody = document.getElementById('tablaHistorialCuerpo');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center hint">Cargando historial...</td></tr>';
+
+        fetch('/api/cxc/facturas')
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success || res.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center hint">No hay facturas generadas.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                res.data.forEach(f => {
+                    const status = parseInt(f.ID_STATUS);
+                    const botonesEstatus = status === 1
+                        ? `
+                            <button class="ghost" style="color:var(--ok);" title="Marcar como pagada" onclick="cambiarEstatus(${f.ID_FACTURA}, 2)">✅</button>
+                            <button class="ghost" style="color:var(--bad);" title="Cancelar" onclick="cambiarEstatus(${f.ID_FACTURA}, 3)">🚫</button>`
+                        : '';
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td style="font-family:var(--mono);">${escapeHtml(f.FOLIO)}</td>
+                            <td class="hint">${formatearFecha(f.FECHA_INICIO_MOVIMIENTOS)} - ${formatearFecha(f.FECHA_FIN_MOVIMIENTOS)}</td>
+                            <td class="hint">${formatearFecha(f.FECHA_PAGO_GENERAL)}</td>
+                            <td style="font-weight:700;">${formatearMoneda(f.TOTAL_FACTURA)}</td>
+                            <td>${badgeEstatus(f.ID_STATUS)}</td>
+                            <td class="text-center">
+                                <button class="ghost" title="Ver detalle" onclick="verDetalle(${f.ID_FACTURA})">👁️</button>
+                                ${botonesEstatus}
+                            </td>
+                        </tr>`;
+                });
+            })
+            .catch(() => {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+            });
+    }
+
+    async function cambiarEstatus(id, nuevoEstatus) {
+        const mensaje = nuevoEstatus === 2 ? '¿Marcar esta factura como pagada?' : '¿Cancelar esta factura?';
+        const ok = await showConfirm(mensaje, {
+            type: nuevoEstatus === 2 ? 'success' : 'danger',
+            title: nuevoEstatus === 2 ? 'Marcar como pagada' : 'Cancelar factura',
+            confirmText: nuevoEstatus === 2 ? 'Marcar pagada' : 'Cancelar'
+        });
+        if (!ok) return;
+
+        fetch(`/api/cxc/facturas/${id}/estatus`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: nuevoEstatus })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+                cargarHistorial();
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    function verDetalle(id) {
+        document.getElementById('cuerpoModalDetalle').innerHTML = '<p class="hint">Cargando...</p>';
+        modalDetalle.show();
+
+        fetch(`/api/cxc/facturas/${id}`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success) {
+                    document.getElementById('cuerpoModalDetalle').innerHTML = '<p class="hint">No se pudo cargar la factura.</p>';
+                    return;
+                }
+
+                const f = res.data;
+                let filasForaneos = '<tr><td colspan="3" class="text-center hint">Sin foráneos.</td></tr>';
+                if (f.foraneos_detalle.length > 0) {
+                    filasForaneos = f.foraneos_detalle.map(d => `
+                        <tr>
+                            <td>${escapeHtml(d.CEDI_NAME)}</td>
+                            <td>${escapeHtml(d.NUMERO)}</td>
+                            <td>${formatearMoneda(d.COSTO)}</td>
+                        </tr>`).join('');
+                }
+
+                document.getElementById('cuerpoModalDetalle').innerHTML = `
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="field"><label>Folio</label><input type="text" value="${escapeHtml(f.FOLIO)}" readonly></div>
+                        <div class="field"><label>Estatus</label><input type="text" value="${status_label(f.ID_STATUS)}" readonly></div>
+                    </div>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field"><label>Rango Movimientos</label><input type="text" value="${formatearFecha(f.FECHA_INICIO_MOVIMIENTOS)} - ${formatearFecha(f.FECHA_FIN_MOVIMIENTOS)}" readonly></div>
+                        <div class="field"><label>Fecha de Pago General</label><input type="text" value="${formatearFecha(f.FECHA_PAGO_GENERAL)}" readonly></div>
+                        <div class="field"><label>Generada por</label><input type="text" value="${escapeHtml(f.USERNAME || '—')}" readonly></div>
+                    </div>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="stat-card"><div class="stat-label">Movimientos</div><div class="stat-value">${f.NUM_MOVIMIENTOS}</div><div class="hint">${formatearMoneda(f.MONTO_MOVIMIENTOS)}</div></div>
+                        <div class="stat-card"><div class="stat-label">Locales</div><div class="stat-value">${f.NUM_LOCALES}</div><div class="hint">${formatearMoneda(f.MONTO_LOCALES)}</div></div>
+                        <div class="stat-card"><div class="stat-label">Foráneos</div><div class="stat-value">${f.NUM_FORANEOS}</div><div class="hint">${formatearMoneda(f.MONTO_FORANEOS)}</div></div>
+                    </div>
+                    <p class="hint" style="text-transform:uppercase;font-family:var(--mono);color:var(--ink);margin-bottom:8px;">Desglose de Foráneos por CEDI</p>
+                    <table style="margin-bottom:14px;">
+                        <thead><tr><th>CEDI</th><th>Número</th><th>Costo</th></tr></thead>
+                        <tbody>${filasForaneos}</tbody>
+                    </table>
+                    <div class="grid grid-4">
+                        <div class="stat-card"><div class="stat-label">Subtotal</div><div class="stat-value">${formatearMoneda(f.SUBTOTAL)}</div></div>
+                        <div class="stat-card"><div class="stat-label">IVA (16%)</div><div class="stat-value">${formatearMoneda(f.IVA)}</div></div>
+                        <div class="stat-card"><div class="stat-label">IVA Retenido (4%)</div><div class="stat-value">${formatearMoneda(f.IVA_RETENIDO)}</div></div>
+                        <div class="stat-card"><div class="stat-label">Total Factura</div><div class="stat-value ok">${formatearMoneda(f.TOTAL_FACTURA)}</div></div>
+                    </div>
+                `;
+            })
+            .catch(() => {
+                document.getElementById('cuerpoModalDetalle').innerHTML = '<p class="hint" style="color:var(--bad);">Error al conectar con el servidor.</p>';
+            });
+    }
+
+    function status_label(idStatus) {
+        const status = parseInt(idStatus);
+        if (status === 2) return 'Pagada';
+        if (status === 3) return 'Cancelada';
+        return 'Generada';
+    }
+
+    document.addEventListener('DOMContentLoaded', cargarHistorial);
+</script>
+
+</body>
+</html>

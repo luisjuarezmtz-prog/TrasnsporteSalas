@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Movimientos</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="brand">
+        <h1>Registro de Movimientos</h1>
+        <a href="dashboard.html" class="link-plain tag">← Inicio</a>
+    </div>
+
+    <div class="panel" style="max-width:480px;margin:0 auto;">
+        <form id="formRegistroMovimientos">
+            <div class="field" style="margin-bottom:12px;">
+                <label for="fechamovimiento">Fecha de movimiento</label>
+                <input type="date" id="fechamovimiento" name="fechamovimiento" required>
+            </div>
+
+            <div class="field" style="margin-bottom:12px;">
+                <label for="operador">Operador</label>
+                <select id="operador" name="operador" required>
+                    <option value="" selected disabled>Cargando operadores...</option>
+                </select>
+            </div>
+
+            <div class="field" style="margin-bottom:12px;">
+                <label for="nummovi">Núm. Movimiento</label>
+                <input type="number" id="nummovi" name="nummovi" placeholder="0" required>
+            </div>
+
+            <div class="field" style="margin-bottom:18px;">
+                <label for="tipomovi">Tipo de Movimiento</label>
+                <select id="tipomovi" name="tipomovi" required>
+                    <option value="" selected disabled>Cargando movimientos...</option>
+                </select>
+            </div>
+
+            <div class="actions" style="justify-content:space-between;">
+                <button type="button" class="ghost" onclick="window.location.href='dashboard.html'">Inicio</button>
+                <button type="submit" id="btnRegistrar" class="primary">Registrar Movimiento</button>
+            </div>
+        </form>
+
+        <p id="message" class="hint" style="margin-top:12px;text-align:center;"></p>
+    </div>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    // Función para cargar datos desde la base de datos (vía API Node.js)
+    async function cargarCatalogos() {
+        try {
+            const resOps = await fetch('/api/empleados_operadores');
+            const operadores = await resOps.json();
+            const selectOp = document.getElementById('operador');
+            selectOp.innerHTML = '<option value="" selected disabled>-- Selecciona un operador --</option>';
+            operadores.forEach(op => {
+                const option = document.createElement('option');
+                option.value = op.ID_EMPLOYEE;
+                option.textContent = op.NAME;
+                selectOp.appendChild(option);
+            });
+
+            const resTipos = await fetch('/api/tipos-movimientos');
+            const tipos = await resTipos.json();
+            const selectTipo = document.getElementById('tipomovi');
+            selectTipo.innerHTML = '<option value="" selected disabled>-- Selecciona el movimiento --</option>';
+            tipos.forEach(t => {
+                const option = document.createElement('option');
+                option.value = t.ID_TYPE_MOTION;
+                option.textContent = t.NAME_MOTION;
+                selectTipo.appendChild(option);
+            });
+
+        } catch (error) {
+            console.error('Error al cargar catálogos:', error);
+            document.getElementById('message').innerText = 'Error al conectar con la base de datos.';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        cargarCatalogos();
+
+        // --- DEPURADOR DE SESIÓN ---
+        // Esto te dirá en la consola qué está leyendo el sistema
+        const userDetectado = localStorage.getItem('user');
+        console.log("Usuario detectado en localStorage:", userDetectado);
+
+        if(!userDetectado) {
+            console.warn("AVISO: No se encontró la variable 'user' en localStorage. Se usará 'Invitado'.");
+        }
+    });
+
+    document.getElementById('formRegistroMovimientos').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const messageDiv = document.getElementById('message');
+        const btn = document.getElementById('btnRegistrar');
+
+        // 1. Intentamos obtener el usuario, si no existe usamos 'Generico' para que NO te saque
+        const usuarioLogeado = localStorage.getItem('username') || 'Usuario_Anonimo';
+
+        // Bloquear botón
+        btn.disabled = true;
+        btn.innerText = "Registrando...";
+
+        const formData = {
+            fecha: document.getElementById('fechamovimiento').value,
+            operador: document.getElementById('operador').value,
+            numero: document.getElementById('nummovi').value,
+            tipo: document.getElementById('tipomovi').value,
+            username: usuarioLogeado
+        };
+
+        try {
+            const response = await fetch('/api/registrar-movimiento', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                messageDiv.innerText = "✅ Registrado con éxito por: " + usuarioLogeado;
+                messageDiv.style.color = "var(--ok)";
+                e.target.reset();
+            } else {
+                throw new Error(result.message || "Error en el servidor");
+            }
+        } catch (err) {
+            messageDiv.innerText = "❌ Error: " + err.message;
+            messageDiv.style.color = "var(--bad)";
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Registrar Movimiento";
+        }
+    });
+</script>
+
+</body>
+</html>

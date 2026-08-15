@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuarios y Roles - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>⚙️ Usuarios y Roles</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<!-- ══════════════════════ USUARIOS ══════════════════════ -->
+<div class="panel">
+    <div class="panel-header">
+        <h2>👤 Usuarios</h2>
+        <button class="primary" onclick="abrirModalAltaUsuario()">➕ Nuevo Usuario</button>
+    </div>
+
+    <div class="grid" style="grid-template-columns:2fr 1fr auto;gap:12px;align-items:end;margin-bottom:18px;">
+        <div class="field">
+            <label>Buscar</label>
+            <input type="text" id="inputBusquedaUsuario" placeholder="Usuario o empleado">
+        </div>
+        <div class="field">
+            <label>Estatus</label>
+            <select id="selectEstatusUsuario">
+                <option value="1" selected>Activos</option>
+                <option value="0">Inactivos (baja)</option>
+                <option value="todos">Todos</option>
+            </select>
+        </div>
+        <button class="primary" onclick="cargarUsuarios()">🔍 Buscar</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Usuario</th>
+                <th>Empleado</th>
+                <th>Rol</th>
+                <th>Estatus</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tablaUsuariosCuerpo">
+            <tr><td colspan="6" class="text-center hint">Cargando usuarios...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- ══════════════════════ ROLES Y PERMISOS ══════════════════════ -->
+<div class="panel">
+    <div class="panel-header">
+        <h2>🛡️ Roles y Permisos de Módulos</h2>
+        <button class="primary" onclick="abrirModalNuevoRol()">➕ Nuevo Rol</button>
+    </div>
+
+    <div class="grid" style="grid-template-columns:1fr auto;gap:12px;align-items:end;margin-bottom:18px;">
+        <div class="field">
+            <label>Rol a configurar</label>
+            <select id="selectRolPermisos" onchange="cargarPermisosDeRol()">
+                <option value="">-- Seleccione un rol --</option>
+            </select>
+        </div>
+        <button class="ghost" onclick="abrirModalEditarRol()">✏️ Renombrar / Estatus</button>
+    </div>
+
+    <div id="matrizPermisos" class="hint">Selecciona un rol para ver y editar qué módulos puede ver.</div>
+</div>
+
+<!-- MODAL ALTA / EDICIÓN DE USUARIO -->
+<div class="modal fade" id="modalUsuario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloModalUsuario">➕ Nuevo Usuario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formUsuario">
+                    <input type="hidden" id="edit_id_user">
+
+                    <div class="field" style="margin-bottom:12px;">
+                        <label>Usuario *</label>
+                        <input type="text" id="username" required>
+                    </div>
+
+                    <div class="field" id="grupoPasswordAlta" style="margin-bottom:12px;">
+                        <label>Contraseña *</label>
+                        <input type="password" id="password" autocomplete="new-password">
+                    </div>
+
+                    <div class="field" style="margin-bottom:12px;">
+                        <label>Correo *</label>
+                        <input type="email" id="mail" required>
+                    </div>
+
+                    <div class="field" style="margin-bottom:12px;">
+                        <label>Rol *</label>
+                        <select id="id_role" required>
+                            <option value="">-- Seleccione --</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Empleado ligado (opcional)</label>
+                        <select id="id_employee">
+                            <option value="">-- Ninguno --</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" onclick="guardarUsuario()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL RESET DE CONTRASEÑA -->
+<div class="modal fade" id="modalResetPassword" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🔑 Resetear Contraseña</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="reset_id_user">
+                <div class="field">
+                    <label>Nueva contraseña *</label>
+                    <input type="password" id="reset_password" autocomplete="new-password">
+                </div>
+                <p class="hint" style="margin-top:8px;">Quedará guardada encriptada (bcrypt).</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" onclick="confirmarResetPassword()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL NUEVO ROL -->
+<div class="modal fade" id="modalNuevoRol" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">➕ Nuevo Rol</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="field">
+                    <label>Nombre del rol *</label>
+                    <input type="text" id="nuevo_rol_nombre" placeholder="Ej: Recursos Humanos">
+                </div>
+                <p class="hint" style="margin-top:8px;">Al crearlo, por default verá todos los módulos; puedes ajustar la matriz de permisos después de guardarlo.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" onclick="guardarNuevoRol()">💾 Crear Rol</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL EDITAR ROL (nombre / estatus) -->
+<div class="modal fade" id="modalEditarRol" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">✏️ Editar Rol</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editar_rol_id">
+                <div class="field" style="margin-bottom:12px;">
+                    <label>Nombre del rol *</label>
+                    <input type="text" id="editar_rol_nombre">
+                </div>
+                <div class="field">
+                    <label>Estatus</label>
+                    <select id="editar_rol_status">
+                        <option value="1">Activo</option>
+                        <option value="0">Inactivo</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" onclick="guardarEdicionRol()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    const modalUsuario = new bootstrap.Modal(document.getElementById('modalUsuario'));
+    const modalResetPassword = new bootstrap.Modal(document.getElementById('modalResetPassword'));
+    const modalNuevoRol = new bootstrap.Modal(document.getElementById('modalNuevoRol'));
+    const modalEditarRol = new bootstrap.Modal(document.getElementById('modalEditarRol'));
+
+    let catalogosUsuario = { roles: [], empleados: [] };
+    let todosLosRoles = []; // incluye roles inactivos, para poder reactivarlos desde "Roles y Permisos"
+    let modulosSistema = [];
+
+    // ───────────────────────── USUARIOS ─────────────────────────
+    // excluirUsuarioId: cuando se edita un usuario, se manda su propio
+    // ID_USER para que su empleado ligado no desaparezca del combo (si
+    // no, el backend lo filtraría por estar "tomado" por él mismo).
+    async function cargarCatalogosUsuario(excluirUsuarioId = 0) {
+        try {
+            const res = await fetch(`/api/usuarios-catalogos?excluir_usuario=${excluirUsuarioId}`);
+            const data = await res.json();
+            if (!data.success) return;
+            catalogosUsuario = data;
+
+            llenarSelect('id_role', catalogosUsuario.roles, 'ID_ROLE', 'ROL_NAME');
+            llenarSelectEmpleados(catalogosUsuario.empleados);
+
+            const resRoles = await fetch('/api/roles');
+            const dataRoles = await resRoles.json();
+            if (dataRoles.success) {
+                todosLosRoles = dataRoles.data;
+                llenarSelectRolesPermisos(todosLosRoles);
+            }
+        } catch (error) {
+            console.error('Error al cargar catálogos de usuario:', error);
+        }
+    }
+
+    function llenarSelect(idSelect, filas, campoId, campoNombre) {
+        const select = document.getElementById(idSelect);
+        const primeraOpcion = select.querySelector('option');
+        select.innerHTML = '';
+        select.appendChild(primeraOpcion);
+        filas.forEach(fila => {
+            const option = document.createElement('option');
+            option.value = fila[campoId];
+            option.textContent = fila[campoNombre];
+            select.appendChild(option);
+        });
+    }
+
+    // Los empleados no tienen un solo campo "nombre" (viene partido en
+    // FIRST_NAME/MIDDLE_NAME/PARENTAL_LAST/MOTHER_LAST), así que se arma
+    // aquí igual que en empleados.html.
+    function llenarSelectEmpleados(empleados) {
+        const select = document.getElementById('id_employee');
+        const primeraOpcion = select.querySelector('option');
+        select.innerHTML = '';
+        select.appendChild(primeraOpcion);
+        empleados.forEach(emp => {
+            const nombreCompleto = `${emp.FIRST_NAME || ''} ${emp.MIDDLE_NAME || ''} ${emp.PARENTAL_LAST || ''} ${emp.MOTHER_LAST || ''}`.replace(/\s+/g, ' ').trim();
+            const option = document.createElement('option');
+            option.value = emp.ID_EMPLOYEE;
+            option.textContent = parseInt(emp.STATUS) === 1 ? nombreCompleto : `${nombreCompleto} (Baja)`;
+            select.appendChild(option);
+        });
+    }
+
+    function cargarUsuarios() {
+        const estatus = document.getElementById('selectEstatusUsuario').value;
+        const busqueda = document.getElementById('inputBusquedaUsuario').value.trim().toLowerCase();
+        const tbody = document.getElementById('tablaUsuariosCuerpo');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center hint">Cargando usuarios...</td></tr>';
+
+        fetch('/api/usuarios')
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center hint">No se pudieron cargar los usuarios.</td></tr>';
+                    return;
+                }
+
+                let filas = res.data;
+
+                if (estatus === '1' || estatus === '0') {
+                    filas = filas.filter(u => String(u.STATUS) === estatus);
+                }
+                if (busqueda) {
+                    filas = filas.filter(u =>
+                        (u.USERNAME || '').toLowerCase().includes(busqueda) ||
+                        (u.EMPLEADO_NOMBRE || '').toLowerCase().includes(busqueda)
+                    );
+                }
+
+                tbody.innerHTML = '';
+
+                if (filas.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center hint">No se encontraron usuarios.</td></tr>';
+                    return;
+                }
+
+                filas.forEach(u => {
+                    const activo = parseInt(u.STATUS) === 1;
+                    const badgeEstatus = activo
+                        ? '<span class="badge badge-ok">Activo</span>'
+                        : '<span class="badge badge-muted">Baja</span>';
+
+                    const botonEstatus = activo
+                        ? `<button class="ghost" style="color:var(--bad);" title="Dar de baja" onclick="cambiarEstatusUsuario(${u.ID_USER}, 0)">🚫</button>`
+                        : `<button class="ghost" style="color:var(--ok);" title="Reactivar" onclick="cambiarEstatusUsuario(${u.ID_USER}, 1)">✅</button>`;
+
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td>${escapeHtml(u.ID_USER)}</td>
+                        <td>${escapeHtml(u.USERNAME)}</td>
+                        <td>${escapeHtml(u.EMPLEADO_NOMBRE || '—')}</td>
+                        <td>${escapeHtml(u.ROL_NAME || '—')}</td>
+                        <td>${badgeEstatus}</td>
+                        <td class="text-center">
+                            <button class="ghost" title="Editar" onclick="abrirModalEdicionUsuario(${u.ID_USER})">✏️</button>
+                            <button class="ghost" title="Resetear contraseña" onclick="abrirModalResetPassword(${u.ID_USER})">🔑</button>
+                            ${botonEstatus}
+                        </td>
+                    `;
+                    tbody.appendChild(fila);
+                });
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+            });
+    }
+
+    function limpiarFormularioUsuario() {
+        document.getElementById('formUsuario').reset();
+        document.getElementById('edit_id_user').value = '';
+    }
+
+    async function abrirModalAltaUsuario() {
+        limpiarFormularioUsuario();
+        document.getElementById('tituloModalUsuario').innerHTML = '➕ Nuevo Usuario';
+        document.getElementById('username').removeAttribute('disabled');
+        document.getElementById('grupoPasswordAlta').style.display = 'block';
+        document.getElementById('password').setAttribute('required', 'required');
+
+        // Refresca el combo de empleados para no ofrecer a alguien que
+        // otro usuario acaba de tomar mientras esta pantalla estaba abierta.
+        await cargarCatalogosUsuario(0);
+
+        modalUsuario.show();
+    }
+
+    function abrirModalEdicionUsuario(id) {
+        // La consulta de usuarios ya está cargada en la tabla; buscamos el
+        // registro correspondiente sin volver a pedirlo al servidor.
+        fetch('/api/usuarios')
+            .then(res => res.json())
+            .then(async res => {
+                if (!res.success) return;
+                const u = res.data.find(x => parseInt(x.ID_USER) === parseInt(id));
+                if (!u) return showAlert('No se encontró el usuario.', 'error');
+
+                limpiarFormularioUsuario();
+                document.getElementById('edit_id_user').value = u.ID_USER;
+                document.getElementById('username').value = u.USERNAME;
+                document.getElementById('username').setAttribute('disabled', 'disabled');
+                document.getElementById('mail').value = u.MAIL || '';
+
+                // Se excluye al propio usuario del filtro de "ya asignados"
+                // para que su empleado ligado siga apareciendo en el combo.
+                // Esto repuebla los combos de rol/empleado, así que los
+                // valores se asignan DESPUÉS de que termine.
+                await cargarCatalogosUsuario(u.ID_USER);
+                document.getElementById('id_role').value = u.ID_ROLE || '';
+                document.getElementById('id_employee').value = u.ID_EMPLOYEE || '';
+
+                // En edición no se toca la contraseña aquí (para eso está "Resetear contraseña").
+                document.getElementById('grupoPasswordAlta').style.display = 'none';
+                document.getElementById('password').removeAttribute('required');
+
+                document.getElementById('tituloModalUsuario').innerHTML = '✏️ Editar Usuario';
+                modalUsuario.show();
+            })
+            .catch(() => showAlert('Error al conectar con el servidor.', 'error'));
+    }
+
+    function guardarUsuario() {
+        const id = document.getElementById('edit_id_user').value;
+        const esEdicion = id !== '';
+
+        const idRole = document.getElementById('id_role').value;
+        const mail = document.getElementById('mail').value.trim();
+        if (!idRole) return showAlert('Selecciona un rol.', 'info');
+        if (!mail) return showAlert('El correo es obligatorio.', 'info');
+
+        if (esEdicion) {
+            const data = {
+                id_role: idRole,
+                mail,
+                id_employee: document.getElementById('id_employee').value || null
+            };
+
+            fetch(`/api/usuarios/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    showAlert(res.message, 'success');
+                    modalUsuario.hide();
+                    cargarUsuarios();
+                } else {
+                    showAlert(res.message || 'Ocurrió un error.', 'error');
+                }
+            })
+            .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+            return;
+        }
+
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+
+        if (!username || !password) {
+            return showAlert('Usuario y contraseña son obligatorios.', 'info');
+        }
+
+        fetch('/api/usuarios', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username, password, mail,
+                id_role: idRole,
+                id_employee: document.getElementById('id_employee').value || null
+            })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+                modalUsuario.hide();
+                cargarUsuarios();
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    function abrirModalResetPassword(id) {
+        document.getElementById('reset_id_user').value = id;
+        document.getElementById('reset_password').value = '';
+        modalResetPassword.show();
+    }
+
+    function confirmarResetPassword() {
+        const id = document.getElementById('reset_id_user').value;
+        const password = document.getElementById('reset_password').value;
+
+        if (!password || password.length < 4) {
+            return showAlert('La contraseña debe tener al menos 4 caracteres.', 'info');
+        }
+
+        fetch(`/api/usuarios/${id}/reset-password`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+                modalResetPassword.hide();
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    async function cambiarEstatusUsuario(id, nuevoEstatus) {
+        const mensaje = nuevoEstatus === 1
+            ? '¿Reactivar a este usuario?'
+            : '¿Dar de baja a este usuario? No podrá iniciar sesión.';
+
+        const ok = await showConfirm(mensaje, {
+            type: nuevoEstatus === 1 ? 'success' : 'danger',
+            title: nuevoEstatus === 1 ? 'Reactivar usuario' : 'Dar de baja',
+            confirmText: nuevoEstatus === 1 ? 'Reactivar' : 'Dar de baja'
+        });
+        if (!ok) return;
+
+        fetch(`/api/usuarios/${id}/estatus`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: nuevoEstatus })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+                cargarUsuarios();
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    // ───────────────────────── ROLES Y PERMISOS ─────────────────────────
+    function llenarSelectRolesPermisos(roles) {
+        const select = document.getElementById('selectRolPermisos');
+        select.innerHTML = '<option value="">-- Seleccione un rol --</option>';
+        roles.forEach(r => {
+            const option = document.createElement('option');
+            option.value = r.ID_ROLE;
+            option.textContent = parseInt(r.STATUS) === 0 ? `${r.ROL_NAME} (Inactivo)` : r.ROL_NAME;
+            select.appendChild(option);
+        });
+    }
+
+    function abrirModalNuevoRol() {
+        document.getElementById('nuevo_rol_nombre').value = '';
+        modalNuevoRol.show();
+    }
+
+    function guardarNuevoRol() {
+        const nombre = document.getElementById('nuevo_rol_nombre').value.trim();
+        if (!nombre) return showAlert('El nombre del rol es obligatorio.', 'info');
+
+        fetch('/api/roles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role_name: nombre, creado_por: localStorage.getItem('username') || 'Sistema' })
+        })
+        .then(res => res.json())
+        .then(async res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+                modalNuevoRol.hide();
+                await cargarCatalogosUsuario();
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    function abrirModalEditarRol() {
+        const idRole = document.getElementById('selectRolPermisos').value;
+        if (!idRole) return showAlert('Selecciona primero un rol.', 'info');
+
+        const rol = todosLosRoles.find(r => String(r.ID_ROLE) === String(idRole));
+        document.getElementById('editar_rol_id').value = idRole;
+        document.getElementById('editar_rol_nombre').value = rol ? rol.ROL_NAME : '';
+        document.getElementById('editar_rol_status').value = rol ? String(rol.STATUS) : '1';
+        modalEditarRol.show();
+    }
+
+    function guardarEdicionRol() {
+        const id = document.getElementById('editar_rol_id').value;
+        const nombre = document.getElementById('editar_rol_nombre').value.trim();
+        const status = document.getElementById('editar_rol_status').value;
+
+        if (!nombre) return showAlert('El nombre del rol es obligatorio.', 'info');
+
+        fetch(`/api/roles/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role_name: nombre, status })
+        })
+        .then(res => res.json())
+        .then(async res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+                modalEditarRol.hide();
+                await cargarCatalogosUsuario();
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    async function cargarModulosSistema() {
+        try {
+            const res = await fetch('/api/modulos-sistema');
+            const data = await res.json();
+            if (data.success) modulosSistema = data.data;
+        } catch (error) {
+            console.error('Error al cargar módulos del sistema:', error);
+        }
+    }
+
+    // Al desmarcar el checkbox de un módulo se deshabilitan (visualmente)
+    // sus submódulos, ya que de cualquier forma el grupo completo se
+    // oculta en el dashboard; al volver a marcarlo se reactivan.
+    function alCambiarModulo(chkModulo) {
+        const idModule = chkModulo.getAttribute('data-id-module');
+        const contenedorSubs = document.querySelector(`.subs-de-modulo[data-id-module="${idModule}"]`);
+        if (!contenedorSubs) return;
+        contenedorSubs.style.opacity = chkModulo.checked ? '1' : '0.5';
+        contenedorSubs.querySelectorAll('.chk-permiso-submodulo').forEach(chk => {
+            chk.disabled = !chkModulo.checked;
+        });
+    }
+
+    async function cargarPermisosDeRol() {
+        const idRole = document.getElementById('selectRolPermisos').value;
+        const contenedor = document.getElementById('matrizPermisos');
+
+        if (!idRole) {
+            contenedor.innerHTML = '<p class="hint">Selecciona un rol para ver y editar qué módulos puede ver.</p>';
+            return;
+        }
+
+        contenedor.innerHTML = '<p class="hint">Cargando permisos...</p>';
+
+        try {
+            const [resMod, resSub] = await Promise.all([
+                fetch(`/api/permisos/${idRole}`).then(r => r.json()),
+                fetch(`/api/permisos-submodulos/${idRole}`).then(r => r.json())
+            ]);
+
+            if (!resMod.success || !resSub.success) {
+                contenedor.innerHTML = '<p class="hint">No se pudieron cargar los permisos.</p>';
+                return;
+            }
+
+            // Agrupar los submódulos por su módulo padre para pintarlos anidados.
+            const submodulosPorModulo = {};
+            resSub.data.forEach(s => {
+                if (!submodulosPorModulo[s.ID_MODULE]) submodulosPorModulo[s.ID_MODULE] = [];
+                submodulosPorModulo[s.ID_MODULE].push(s);
+            });
+
+            let html = '';
+            resMod.data.forEach(m => {
+                const moduloVisible = parseInt(m.CAN_VIEW) === 1;
+                const checkedModulo = moduloVisible ? 'checked' : '';
+                const subs = submodulosPorModulo[m.ID_MODULE] || [];
+
+                html += `
+                    <div class="panel" style="margin-bottom:10px;padding:12px 16px;">
+                        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:14px;color:var(--ink);font-weight:600;">
+                            <input type="checkbox" class="chk-permiso-modulo" data-id-module="${m.ID_MODULE}" ${checkedModulo} onchange="alCambiarModulo(this)">
+                            ${escapeHtml(m.MODULE_LABEL)}
+                        </label>`;
+
+                if (subs.length > 0) {
+                    html += `<div class="subs-de-modulo" data-id-module="${m.ID_MODULE}" style="margin:10px 0 0 26px;display:flex;flex-direction:column;gap:6px;opacity:${moduloVisible ? '1' : '0.5'};">`;
+                    subs.forEach(s => {
+                        const checkedSub = parseInt(s.CAN_VIEW) === 1 ? 'checked' : '';
+                        const disabledSub = moduloVisible ? '' : 'disabled';
+                        html += `
+                            <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--ink);">
+                                <input type="checkbox" class="chk-permiso-submodulo" data-id-submodule="${s.ID_SUBMODULE}" ${checkedSub} ${disabledSub}>
+                                ${escapeHtml(s.SUBMODULE_LABEL)}
+                            </label>`;
+                    });
+                    html += '</div>';
+                }
+
+                html += '</div>';
+            });
+            html += '<button class="primary" onclick="guardarMatrizPermisos()">💾 Guardar Permisos</button>';
+            html += '<p class="hint" style="margin-top:8px;">Al desmarcar un módulo se oculta todo el grupo; dentro de un módulo activo puedes limitar qué opciones específicas ve el rol.</p>';
+
+            contenedor.innerHTML = html;
+        } catch (error) {
+            contenedor.innerHTML = '<p class="hint" style="color:var(--bad);">Error al conectar con el servidor.</p>';
+        }
+    }
+
+    function guardarMatrizPermisos() {
+        const idRole = document.getElementById('selectRolPermisos').value;
+        if (!idRole) return;
+
+        const permisos = Array.from(document.querySelectorAll('.chk-permiso-modulo')).map(chk => ({
+            id_module: chk.getAttribute('data-id-module'),
+            can_view: chk.checked ? 1 : 0
+        }));
+
+        // Los submódulos deshabilitados (porque su módulo está apagado) se
+        // guardan tal cual estaban marcados, no se pierden al reactivarlos.
+        const permisosSubmodulos = Array.from(document.querySelectorAll('.chk-permiso-submodulo')).map(chk => ({
+            id_submodule: chk.getAttribute('data-id-submodule'),
+            can_view: chk.checked ? 1 : 0
+        }));
+
+        Promise.all([
+            fetch(`/api/permisos/${idRole}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ permisos })
+            }).then(r => r.json()),
+            fetch(`/api/permisos-submodulos/${idRole}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ permisos: permisosSubmodulos })
+            }).then(r => r.json())
+        ])
+        .then(([resMod, resSub]) => {
+            if (resMod.success && resSub.success) {
+                showAlert('Permisos actualizados correctamente.', 'success');
+            } else {
+                showAlert((resMod.message || resSub.message) || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        await cargarCatalogosUsuario();
+        await cargarModulosSistema();
+        cargarUsuarios();
+    });
+</script>
+
+</body>
+</html>

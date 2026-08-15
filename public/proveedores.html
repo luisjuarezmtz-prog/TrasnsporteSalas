@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Proveedores - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>🏭 Gestión de Proveedores</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<div class="panel">
+    <div class="grid" style="grid-template-columns:2fr 1fr auto auto;gap:12px;align-items:end;margin-bottom:18px;">
+        <div class="field">
+            <label>Buscar</label>
+            <input type="text" id="inputBusqueda" placeholder="Nombre empresarial, comercial o RFC">
+        </div>
+        <div class="field">
+            <label>Estatus</label>
+            <select id="selectEstatus">
+                <option value="todos" selected>Todos</option>
+                <option value="1">En Autorización</option>
+                <option value="2">Autorizado</option>
+                <option value="3">Rechazado</option>
+            </select>
+        </div>
+        <button class="primary" onclick="cargarProveedores()">🔍 Buscar</button>
+        <button class="primary" onclick="abrirModalAlta()">➕ Nuevo Proveedor</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre Empresarial</th>
+                <th>Nombre Comercial</th>
+                <th>RFC</th>
+                <th>Días Crédito</th>
+                <th>Estatus</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            <tr><td colspan="7" class="text-center hint">Cargando proveedores...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- MODAL ALTA / EDICIÓN -->
+<div class="modal fade" id="modalProveedor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloModalProveedor">➕ Nuevo Proveedor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formProveedor">
+                    <input type="hidden" id="edit_id">
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:14px;">Datos Generales</h6>
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Nombre Empresarial *</label>
+                            <input type="text" id="nombre_empresarial" required>
+                        </div>
+                        <div class="field">
+                            <label>Nombre Comercial</label>
+                            <input type="text" id="nombre_proveedor">
+                        </div>
+                    </div>
+                    <div class="grid grid-3" style="margin-bottom:8px;">
+                        <div class="field">
+                            <label>RFC</label>
+                            <input type="text" id="rfc" maxlength="13" style="text-transform:uppercase;">
+                        </div>
+                        <div class="field">
+                            <label>Días de Crédito</label>
+                            <input type="number" id="dias_credito">
+                        </div>
+                        <div class="field">
+                            <label>Teléfono</label>
+                            <input type="text" id="telefono" maxlength="15">
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Contacto, dirección, cuentas y documentos solo aplican a un
+                     proveedor que ya existe (necesitan su ID_PROVEEDOR); se
+                     muestran siempre, pero permanecen deshabilitadas hasta
+                     que se guarde por primera vez el formulario de arriba. -->
+                <p id="avisoGuardarPrimero" class="hint" style="margin:18px 0 0;">
+                    Guarda los datos generales del proveedor para poder agregar su contacto, dirección, cuentas bancarias y documentos.
+                </p>
+
+                <div id="seccionesExtra">
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:18px 0 14px;">Contacto de Referencia</h6>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Nombre</label>
+                            <input type="text" id="contacto_nombre">
+                        </div>
+                        <div class="field">
+                            <label>Teléfono</label>
+                            <input type="text" id="contacto_telefono" maxlength="15">
+                        </div>
+                        <div class="field">
+                            <label>Correo</label>
+                            <input type="email" id="contacto_email">
+                        </div>
+                    </div>
+                    <div class="actions" style="margin-bottom:8px;">
+                        <button type="button" class="ghost" onclick="guardarContacto()">💾 Guardar Contacto</button>
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:22px 0 14px;">Domicilio</h6>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field" style="grid-column:span 1;">
+                            <label>Calle</label>
+                            <input type="text" id="direccion_calle">
+                        </div>
+                        <div class="field">
+                            <label>No. Exterior</label>
+                            <input type="text" id="direccion_num_ext">
+                        </div>
+                        <div class="field">
+                            <label>No. Interior</label>
+                            <input type="text" id="direccion_num_int">
+                        </div>
+                    </div>
+                    <div class="grid grid-2" style="margin-bottom:8px;">
+                        <div class="field">
+                            <label>Colonia</label>
+                            <input type="text" id="direccion_colonia">
+                        </div>
+                        <div class="field">
+                            <label>Código Postal</label>
+                            <input type="text" id="direccion_cod_postal" maxlength="10">
+                        </div>
+                    </div>
+                    <div class="actions" style="margin-bottom:8px;">
+                        <button type="button" class="ghost" onclick="guardarDireccion()">💾 Guardar Domicilio</button>
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:22px 0 14px;">Cuentas Bancarias</h6>
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="panel" style="margin-bottom:0;padding:14px 16px;">
+                            <p class="hint" style="margin:0 0 10px;text-transform:uppercase;font-family:var(--mono);color:var(--ink);">Principal</p>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>Banco</label>
+                                <select id="principal_id_banco">
+                                    <option value="">-- Seleccione --</option>
+                                </select>
+                            </div>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>No. de Cuenta</label>
+                                <input type="text" id="principal_numero_cuenta">
+                            </div>
+                            <div class="field">
+                                <label>CLABE Interbancaria</label>
+                                <input type="text" id="principal_clabe" maxlength="18">
+                            </div>
+                        </div>
+                        <div class="panel" style="margin-bottom:0;padding:14px 16px;">
+                            <p class="hint" style="margin:0 0 10px;text-transform:uppercase;font-family:var(--mono);color:var(--ink);">Respaldo</p>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>Banco</label>
+                                <select id="respaldo_id_banco">
+                                    <option value="">-- Seleccione --</option>
+                                </select>
+                            </div>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>No. de Cuenta</label>
+                                <input type="text" id="respaldo_numero_cuenta">
+                            </div>
+                            <div class="field">
+                                <label>CLABE Interbancaria</label>
+                                <input type="text" id="respaldo_clabe" maxlength="18">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="actions" style="margin-bottom:8px;">
+                        <button type="button" class="ghost" onclick="guardarCuentasBancarias()">💾 Guardar Cuentas Bancarias</button>
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:22px 0 14px;">Documentos</h6>
+                    <div class="grid" style="grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin-bottom:14px;">
+                        <div class="field">
+                            <label>Tipo de Documento</label>
+                            <select id="select_tipo_documento">
+                                <option value="">-- Seleccione --</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Archivo (PDF, JPG o PNG)</label>
+                            <input type="file" id="input_documento" accept="application/pdf,image/png,image/jpeg">
+                        </div>
+                        <button type="button" class="ghost" onclick="agregarDocumento()">➕ Agregar</button>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Archivo</th>
+                                <th>Fecha</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaDocumentosCuerpo">
+                            <tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" onclick="guardarProveedor()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    const modalProveedor = new bootstrap.Modal(document.getElementById('modalProveedor'));
+    let catalogos = { bancos: [], tiposDocumento: [] };
+
+    async function cargarCatalogos() {
+        try {
+            const res = await fetch('/api/proveedores-catalogos');
+            const data = await res.json();
+            if (!data.success) return;
+            catalogos = data;
+
+            llenarSelect('principal_id_banco', catalogos.bancos, 'ID_BANCO', 'BANCO_NAME');
+            llenarSelect('respaldo_id_banco', catalogos.bancos, 'ID_BANCO', 'BANCO_NAME');
+            llenarSelect('select_tipo_documento', catalogos.tiposDocumento, 'ID_DOCUMENT_TYPE', 'DOCUMENT_TYPE_NAME');
+        } catch (error) {
+            console.error('Error al cargar catálogos:', error);
+        }
+    }
+
+    function llenarSelect(idSelect, filas, campoId, campoNombre) {
+        const select = document.getElementById(idSelect);
+        filas.forEach(fila => {
+            const option = document.createElement('option');
+            option.value = fila[campoId];
+            option.textContent = fila[campoNombre];
+            select.appendChild(option);
+        });
+    }
+
+    function badgeEstatusProveedor(estatus) {
+        switch (parseInt(estatus)) {
+            case 1: return '<span class="badge badge-warn">En Autorización</span>';
+            case 2: return '<span class="badge badge-ok">Autorizado</span>';
+            case 3: return '<span class="badge badge-bad">Rechazado</span>';
+            default: return '<span class="badge badge-muted">—</span>';
+        }
+    }
+
+    function cargarProveedores() {
+        const estatus = document.getElementById('selectEstatus').value;
+        const busqueda = document.getElementById('inputBusqueda').value.trim();
+        const tbody = document.getElementById('tablaCuerpo');
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center hint">Cargando proveedores...</td></tr>';
+
+        const params = new URLSearchParams();
+        if (estatus) params.set('estatus', estatus);
+        if (busqueda) params.set('busqueda', busqueda);
+
+        fetch(`/api/proveedores-consulta?${params.toString()}`)
+            .then(res => res.json())
+            .then(res => {
+                tbody.innerHTML = '';
+
+                if (!res.success || res.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center hint">No se encontraron proveedores.</td></tr>';
+                    return;
+                }
+
+                res.data.forEach(prov => {
+                    const estatus = parseInt(prov.ESTATUS);
+                    const badgeEstatus = badgeEstatusProveedor(estatus);
+
+                    const botonEstatus = estatus === 1
+                        ? `<button class="ghost" style="color:var(--ok);" title="Autorizar" onclick="cambiarEstatus(${prov.ID_PROVEEDOR}, 2)">✅</button>
+                           <button class="ghost" style="color:var(--bad);" title="Rechazar" onclick="cambiarEstatus(${prov.ID_PROVEEDOR}, 3)">🚫</button>`
+                        : '';
+
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td>${escapeHtml(prov.ID_PROVEEDOR)}</td>
+                        <td>${escapeHtml(prov.NOMBRE_EMPRESARIAL)}</td>
+                        <td>${escapeHtml(prov.NOMBRE_PROVEEDOR || '—')}</td>
+                        <td>${escapeHtml(prov.RFC || '—')}</td>
+                        <td>${escapeHtml(prov.DIAS_CREDITO ?? '—')}</td>
+                        <td>${badgeEstatus}</td>
+                        <td class="text-center">
+                            <button class="ghost" title="Editar" onclick="abrirModalEdicion(${prov.ID_PROVEEDOR})">✏️</button>
+                            ${botonEstatus}
+                        </td>
+                    `;
+                    tbody.appendChild(fila);
+                });
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+            });
+    }
+
+    function limpiarFormulario() {
+        document.getElementById('formProveedor').reset();
+        document.getElementById('edit_id').value = '';
+        document.getElementById('contacto_nombre').value = '';
+        document.getElementById('contacto_telefono').value = '';
+        document.getElementById('contacto_email').value = '';
+        document.getElementById('direccion_calle').value = '';
+        document.getElementById('direccion_num_ext').value = '';
+        document.getElementById('direccion_num_int').value = '';
+        document.getElementById('direccion_colonia').value = '';
+        document.getElementById('direccion_cod_postal').value = '';
+        document.getElementById('principal_id_banco').value = '';
+        document.getElementById('principal_numero_cuenta').value = '';
+        document.getElementById('principal_clabe').value = '';
+        document.getElementById('respaldo_id_banco').value = '';
+        document.getElementById('respaldo_numero_cuenta').value = '';
+        document.getElementById('respaldo_clabe').value = '';
+        document.getElementById('input_documento').value = '';
+        document.getElementById('tablaDocumentosCuerpo').innerHTML = '<tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>';
+    }
+
+    // Las secciones de contacto/dirección/cuentas/documentos siempre se ven,
+    // pero solo se pueden usar cuando el proveedor ya existe (necesitan su
+    // ID_PROVEEDOR para guardar), así que mientras tanto se deshabilitan.
+    function mostrarSeccionesExtra(habilitar) {
+        const contenedor = document.getElementById('seccionesExtra');
+        contenedor.querySelectorAll('input, select, button').forEach(el => {
+            el.disabled = !habilitar;
+        });
+        contenedor.style.opacity = habilitar ? '1' : '0.5';
+        document.getElementById('avisoGuardarPrimero').style.display = habilitar ? 'none' : 'block';
+    }
+
+    function abrirModalAlta() {
+        limpiarFormulario();
+        mostrarSeccionesExtra(false);
+        document.getElementById('tituloModalProveedor').innerHTML = '➕ Nuevo Proveedor';
+        modalProveedor.show();
+    }
+
+    async function abrirModalEdicion(id) {
+        try {
+            const res = await fetch(`/api/proveedores/${id}/detalle`);
+            const data = await res.json();
+            if (!data.success) return showAlert(data.message || 'No se pudo cargar el proveedor.', 'error');
+
+            const prov = data.data;
+            limpiarFormulario();
+            document.getElementById('edit_id').value = prov.ID_PROVEEDOR;
+            document.getElementById('nombre_empresarial').value = prov.NOMBRE_EMPRESARIAL || '';
+            document.getElementById('nombre_proveedor').value = prov.NOMBRE_PROVEEDOR || '';
+            document.getElementById('rfc').value = prov.RFC || '';
+            document.getElementById('dias_credito').value = prov.DIAS_CREDITO ?? '';
+            document.getElementById('telefono').value = prov.TELEFONO || '';
+
+            mostrarSeccionesExtra(true);
+            cargarContacto(prov.ID_PROVEEDOR);
+            cargarDireccion(prov.ID_PROVEEDOR);
+            cargarCuentasBancarias(prov.ID_PROVEEDOR);
+            cargarDocumentos(prov.ID_PROVEEDOR);
+
+            document.getElementById('tituloModalProveedor').innerHTML = '✏️ Editar Proveedor';
+            modalProveedor.show();
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Error al conectar con el servidor.', 'error');
+        }
+    }
+
+    function guardarProveedor() {
+        const id = document.getElementById('edit_id').value;
+        const esEdicion = id !== '';
+
+        const data = {
+            nombre_empresarial: document.getElementById('nombre_empresarial').value.trim(),
+            nombre_proveedor: document.getElementById('nombre_proveedor').value.trim(),
+            rfc: document.getElementById('rfc').value.trim().toUpperCase(),
+            dias_credito: document.getElementById('dias_credito').value || null,
+            telefono: document.getElementById('telefono').value.trim(),
+            username: localStorage.getItem('username') || 'Sistema'
+        };
+
+        if (!data.nombre_empresarial) {
+            return showAlert('El nombre empresarial es obligatorio.', 'info');
+        }
+
+        const url = esEdicion ? `/api/proveedores/${id}` : '/api/proveedores';
+        const metodo = esEdicion ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: metodo,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (!res.success) {
+                return showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+
+            if (esEdicion) {
+                showAlert(res.message, 'success');
+                modalProveedor.hide();
+                cargarProveedores();
+                return;
+            }
+
+            // Alta: el proveedor recién creado ya tiene ID_PROVEEDOR, así que
+            // dejamos el modal abierto (ahora en modo edición) para poder
+            // agregar contacto, dirección, cuentas y documentos de una vez.
+            showAlert('Proveedor registrado. Ya puedes agregar su contacto, dirección, cuentas bancarias y documentos.', 'success', 3000);
+            document.getElementById('edit_id').value = res.id_proveedor;
+            document.getElementById('tituloModalProveedor').innerHTML = '✏️ Editar Proveedor';
+            mostrarSeccionesExtra(true);
+            cargarDocumentos(res.id_proveedor);
+            cargarProveedores();
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    async function cambiarEstatus(id, nuevoEstatus) {
+        const mensaje = nuevoEstatus === 2
+            ? '¿Autorizar a este proveedor?'
+            : '¿Rechazar a este proveedor?';
+
+        const ok = await showConfirm(mensaje, {
+            type: nuevoEstatus === 2 ? 'success' : 'danger',
+            title: nuevoEstatus === 2 ? 'Autorizar proveedor' : 'Rechazar proveedor',
+            confirmText: nuevoEstatus === 2 ? 'Autorizar' : 'Rechazar'
+        });
+        if (!ok) return;
+
+        fetch(`/api/proveedores/${id}/estatus`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: nuevoEstatus })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+                cargarProveedores();
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    // ───────────────────────── CONTACTO DE REFERENCIA ─────────────────────────
+    function cargarContacto(id) {
+        fetch(`/api/proveedores/${id}/contacto`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success) return;
+                const c = res.data;
+                document.getElementById('contacto_nombre').value = c ? (c.NOMBRE || '') : '';
+                document.getElementById('contacto_telefono').value = c ? (c.TELEFONO || '') : '';
+                document.getElementById('contacto_email').value = c ? (c.EMAIL || '') : '';
+            })
+            .catch(err => console.error('Error al cargar contacto de referencia:', err));
+    }
+
+    function guardarContacto() {
+        const id = document.getElementById('edit_id').value;
+        const data = {
+            nombre: document.getElementById('contacto_nombre').value.trim(),
+            telefono: document.getElementById('contacto_telefono').value.trim(),
+            email: document.getElementById('contacto_email').value.trim()
+        };
+
+        fetch(`/api/proveedores/${id}/contacto`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    // ───────────────────────── DIRECCIÓN ─────────────────────────
+    function cargarDireccion(id) {
+        fetch(`/api/proveedores/${id}/direccion`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success) return;
+                const d = res.data;
+                document.getElementById('direccion_calle').value = d ? (d.CALLE || '') : '';
+                document.getElementById('direccion_num_ext').value = d ? (d.NUM_EXT || '') : '';
+                document.getElementById('direccion_num_int').value = d ? (d.NUM_INT || '') : '';
+                document.getElementById('direccion_colonia').value = d ? (d.COLONIA || '') : '';
+                document.getElementById('direccion_cod_postal').value = d ? (d.COD_POSTAL || '') : '';
+            })
+            .catch(err => console.error('Error al cargar dirección:', err));
+    }
+
+    function guardarDireccion() {
+        const id = document.getElementById('edit_id').value;
+        const data = {
+            calle: document.getElementById('direccion_calle').value.trim(),
+            num_ext: document.getElementById('direccion_num_ext').value.trim(),
+            num_int: document.getElementById('direccion_num_int').value.trim(),
+            colonia: document.getElementById('direccion_colonia').value.trim(),
+            cod_postal: document.getElementById('direccion_cod_postal').value.trim()
+        };
+
+        fetch(`/api/proveedores/${id}/direccion`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    // ───────────────────────── CUENTAS BANCARIAS ─────────────────────────
+    function cargarCuentasBancarias(id) {
+        fetch(`/api/proveedores/${id}/cuentas-bancarias`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success) return;
+                const { principal, respaldo } = res.data;
+                document.getElementById('principal_id_banco').value = principal ? (principal.ID_BANCO || '') : '';
+                document.getElementById('principal_numero_cuenta').value = principal ? (principal.NUMERO_CUENTA || '') : '';
+                document.getElementById('principal_clabe').value = principal ? (principal.CLABE || '') : '';
+                document.getElementById('respaldo_id_banco').value = respaldo ? (respaldo.ID_BANCO || '') : '';
+                document.getElementById('respaldo_numero_cuenta').value = respaldo ? (respaldo.NUMERO_CUENTA || '') : '';
+                document.getElementById('respaldo_clabe').value = respaldo ? (respaldo.CLABE || '') : '';
+            })
+            .catch(err => console.error('Error al cargar cuentas bancarias:', err));
+    }
+
+    function guardarCuentasBancarias() {
+        const id = document.getElementById('edit_id').value;
+        const data = {
+            principal: {
+                id_banco: document.getElementById('principal_id_banco').value || null,
+                numero_cuenta: document.getElementById('principal_numero_cuenta').value.trim(),
+                clabe: document.getElementById('principal_clabe').value.trim()
+            },
+            respaldo: {
+                id_banco: document.getElementById('respaldo_id_banco').value || null,
+                numero_cuenta: document.getElementById('respaldo_numero_cuenta').value.trim(),
+                clabe: document.getElementById('respaldo_clabe').value.trim()
+            }
+        };
+
+        fetch(`/api/proveedores/${id}/cuentas-bancarias`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    // ───────────────────────── DOCUMENTOS ─────────────────────────
+    function formatearFecha(fechaIso) {
+        if (!fechaIso) return '—';
+        const f = new Date(fechaIso);
+        return f.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    }
+
+    function cargarDocumentos(id) {
+        const tbody = document.getElementById('tablaDocumentosCuerpo');
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center hint">Cargando documentos...</td></tr>';
+
+        fetch(`/api/proveedores/${id}/documentos`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success || res.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                res.data.forEach(docu => {
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td>${escapeHtml(docu.DOCUMENT_TYPE_NAME)}</td>
+                        <td><a href="${docu.FILE_PATH}" target="_blank" rel="noopener">${escapeHtml(docu.FILE_NAME)}</a></td>
+                        <td>${formatearFecha(docu.UPLOAD_DATE)}</td>
+                        <td class="text-center">
+                            <button class="ghost" style="color:var(--bad);" title="Eliminar" onclick="eliminarDocumento(${docu.ID_DOCUMENTO}, ${id})">🗑️</button>
+                        </td>
+                    `;
+                    tbody.appendChild(fila);
+                });
+            })
+            .catch(err => {
+                console.error('Error al cargar documentos:', err);
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+            });
+    }
+
+    function agregarDocumento() {
+        const id = document.getElementById('edit_id').value;
+        const idTipo = document.getElementById('select_tipo_documento').value;
+        const archivo = document.getElementById('input_documento').files[0];
+
+        if (!idTipo) return showAlert('Selecciona el tipo de documento.', 'info');
+        if (!archivo) return showAlert('Selecciona un archivo.', 'info');
+
+        const formData = new FormData();
+        formData.append('documento', archivo);
+        formData.append('id_document_type', idTipo);
+
+        fetch(`/api/proveedores/${id}/documentos`, { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    showAlert(res.message, 'success');
+                    document.getElementById('select_tipo_documento').value = '';
+                    document.getElementById('input_documento').value = '';
+                    cargarDocumentos(id);
+                } else {
+                    showAlert(res.message || 'Ocurrió un error.', 'error');
+                }
+            })
+            .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    async function eliminarDocumento(idDocumento, idProveedor) {
+        const ok = await showConfirm('¿Eliminar este documento? Esta acción no se puede deshacer.', {
+            type: 'danger', title: 'Eliminar documento', confirmText: 'Eliminar'
+        });
+        if (!ok) return;
+
+        fetch(`/api/proveedores/documentos/${idDocumento}`, { method: 'DELETE' })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    showAlert(res.message, 'success');
+                    cargarDocumentos(idProveedor);
+                } else {
+                    showAlert(res.message || 'Ocurrió un error.', 'error');
+                }
+            })
+            .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        cargarCatalogos();
+        cargarProveedores();
+    });
+</script>
+
+</body>
+</html>

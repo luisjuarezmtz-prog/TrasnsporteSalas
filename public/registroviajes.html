@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Viajes - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+    <div class="brand">
+        <h1>Registro de Viajes</h1>
+        <a href="dashboard.html" class="link-plain tag">← Inicio</a>
+    </div>
+
+    <div class="panel" style="max-width:480px;margin:0 auto;">
+        <form id="formRegistroViajes">
+            <div class="field" style="margin-bottom:12px;">
+                <label for="ordencompra">Orden de compra</label>
+                <input type="number" id="ordencompra" placeholder="Ej: 12345" required>
+            </div>
+
+            <div class="field" style="margin-bottom:12px;">
+                <label for="fechaorden">Fecha de orden</label>
+                <input type="date" id="fechaorden" required>
+            </div>
+
+            <div class="field" style="margin-bottom:12px;">
+                <label for="fechaentrega">Fecha de entrega</label>
+                <input type="date" id="fechaentrega" required>
+            </div>
+
+            <div class="field" style="margin-bottom:12px;">
+                <label for="fechapago">Fecha de pago</label>
+                <input type="date" id="fechapago" required>
+            </div>
+
+            <div class="field" style="margin-bottom:12px;">
+                <label for="horaentrega">Hora de entrega</label>
+                <input type="time" id="horaentrega" required>
+            </div>
+
+            <div class="field" style="margin-bottom:12px;">
+                <label for="numtotopos">Num Totopos</label>
+                <input type="number" id="numtotopos" placeholder="0" required>
+            </div>
+
+            <div class="field" style="margin-bottom:12px;">
+                <label for="numtostadas">Num Tostadas</label>
+                <input type="number" id="numtostadas" placeholder="0" required>
+            </div>
+
+            <div class="field" style="margin-bottom:18px;">
+                <label for="cedi_select">Cedi Destino</label>
+                <select id="cedi_select" name="cedi" required>
+                    <option value="" selected disabled>-- Selecciona un Cedi --</option>
+                </select>
+            </div>
+
+            <div class="actions" style="justify-content:space-between;">
+                <button type="button" class="ghost" onclick="window.location.href='dashboard.html'">Inicio</button>
+                <button type="submit" id="btnRegistrar" class="primary">Registrar Viaje</button>
+            </div>
+        </form>
+
+        <p id="message" class="hint" style="margin-top:12px;text-align:center;"></p>
+    </div>
+
+    <script>
+        // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
+        // 1. Protección de acceso
+        (function checkAccess() {
+            const user = localStorage.getItem('username');
+            if (!user) { window.location.href = 'index.html'; }
+        })();
+
+        // 2. Cargar Cedis (Corregido para usar nombres de propiedades directos)
+        async function cargarCedis() {
+            const select = document.getElementById('cedi_select');
+            try {
+                const response = await fetch('/api/cedis');
+                const cedis = await response.json();
+
+                // Limpiar antes de llenar (por si acaso)
+                select.innerHTML = '<option value="" selected disabled>-- Selecciona un Cedi --</option>';
+
+                cedis.forEach(cedi => {
+                    const option = document.createElement('option');
+                    // Usamos los nombres de columna exactos definidos en server.js
+                    option.value = cedi.ID_CEDI;
+                    option.textContent = cedi.CEDI_NAME;
+                    select.appendChild(option);
+                });
+                console.log("✅ Catálogo de CEDIS cargado correctamente.");
+            } catch (error) {
+                console.error("❌ Error al cargar Cedis:", error);
+                document.getElementById('message').innerText = "❌ Error al conectar con el catálogo de Cedis.";
+            }
+        }
+
+        window.onload = cargarCedis;
+
+        // 3. Registrar el viaje
+        document.getElementById('formRegistroViajes').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const valida =
+                 parseInt(document.getElementById('ordencompra').value);
+
+            try {
+                const response = await fetch(`/api/valida-orden-compra?id_compra=${encodeURIComponent(valida)}`);
+
+                const respuesta = await response.json();
+                if(respuesta.existe){
+                   showAlert('Orden de compra ya existente, ingrese una nueva', 'error');
+                   return;
+                }
+            }
+
+            catch(error){console.error(error)}
+
+
+            const messageDiv = document.getElementById('message');
+            messageDiv.style.color = "";
+            messageDiv.innerText = "Enviando...";
+
+            const datos = {
+                purchase_order: parseInt(document.getElementById('ordencompra').value),
+                order_date: document.getElementById('fechaorden').value,
+                delivery_date: document.getElementById('fechaentrega').value,
+                payment_date: document.getElementById('fechapago').value,
+                delivery_time: document.getElementById('horaentrega').value,
+                num_totopos: parseInt(document.getElementById('numtotopos').value) || 0,
+                num_tostada: parseInt(document.getElementById('numtostadas').value) || 0,
+                id_cedi: document.getElementById('cedi_select').value, // ID del CEDI
+                username: localStorage.getItem('username')
+            };
+
+            try {
+                const response = await fetch('/api/registrar-viaje', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(datos)
+                });
+
+                const resData = await response.json();
+
+                if (response.ok) {
+                    messageDiv.style.color = "var(--ok)";
+                    messageDiv.innerText = `✅ Orden registrada con éxito.`;
+                    document.getElementById('formRegistroViajes').reset();
+                    // Opcional: recargar cedis si es necesario
+                } else {
+                    messageDiv.style.color = "var(--bad)";
+                    messageDiv.innerText = "❌ " + (resData.message || "Error al registrar");
+                }
+            } catch (error) {
+                console.error("Error en Fetch:", error);
+                messageDiv.style.color = "var(--bad)";
+                messageDiv.innerText = "❌ Error de conexión al servidor.";
+            }
+        });
+    </script>
+</body>
+</html>

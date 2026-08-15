@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/index.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+    <div class="login-container">
+        <img src="imagenes/Logo.jpeg" alt="Transportes Salas Logo">
+        <h2>Iniciar Sesión</h2>
+        <form id="loginForm">
+            <div class="field"><input type="text" id="username" placeholder="Nombre de usuario" required></div>
+            <div class="field"><input type="password" id="password" placeholder="Contraseña" required></div>
+            <button type="submit" class="primary">Entrar</button>
+        </form>
+        <p id="message"></p>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const usernameInput = document.getElementById('username').value;
+            const passwordInput = document.getElementById('password').value;
+            const messageElement = document.getElementById('message');
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: usernameInput, password: passwordInput })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // --- CAMBIO CLAVE AQUÍ ---
+                    // Guardamos el nombre de usuario bajo la clave 'usuario_salas'
+                    // Usamos data.user que es el nombre que devuelve tu server.js
+                    localStorage.setItem('usuario_salas', data.user);
+                    
+                    // También guardamos 'username' por si lo usas en otros lados
+                    localStorage.setItem('username', data.user);
+
+                    localStorage.setItem('rol', data.rol);
+
+                    // Redirigimos al Dashboard
+                    window.location.href = 'dashboard.html';
+                } else {
+                    // Si hay error (401, 403, etc), mostramos el mensaje del servidor
+                    messageElement.innerText = data.message;
+                }
+            } catch (error) {
+                console.error("Error en el login:", error);
+                messageElement.innerText = "Error de conexión con el servidor";
+            }
+        });
+    </script>
+    
+</body>
+</html>

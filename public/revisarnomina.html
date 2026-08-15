@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revisar Nómina - Transportes Salas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/revisarnomina.css">
+</head>
+<body>
+
+<div class="brand">
+    <h1>🔍 Consultar Nómina por Folio</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<div class="panel">
+    <div class="grid" style="grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:16px;align-items:end;">
+        <div class="field">
+            <input type="text" id="inputFolio" placeholder="Ingrese el folio (Ej: NOM-20260407-1234)">
+        </div>
+        <button class="primary" onclick="buscarPorFolio()">🔍 Buscar Registros</button>
+        <button class="btn-excel" onclick="exportarExcel()">📄 Excel</button>
+    </div>
+
+    <div id="contenedorAcciones" class="text-right" style="display: none;margin-bottom:14px;">
+        <button class="primary" onclick="enviarSeleccionados()">📧 Enviar Notificación</button>
+    </div>
+
+    <table id="tablaMovimientos">
+        <thead>
+            <tr>
+                <th width="40"><input type="checkbox" id="checkAll" onclick="seleccionarTodo(this)"></th>
+                <th>ID</th>
+                <th>Empleado</th>
+                <th>F. Pago</th>
+                <th>Periodo</th>
+                <th>Estado</th>
+                <th>Neto</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo"></tbody>
+    </table>
+</div>
+
+<div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">✏️ Editar Registro de Nómina</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditar">
+                    <input type="hidden" id="edit_id_payroll">
+
+                    <div class="field" style="margin-bottom:14px;">
+                        <label>Empleado</label>
+                        <input type="text" id="edit_nombre" readonly>
+                    </div>
+
+                    <div class="field" style="margin-bottom:14px;">
+                        <label>Estado del Pago</label>
+                        <select id="edit_status">
+                            <option value="1">Generada</option>
+                            <option value="2">Pagada</option>
+                            <option value="3">Cancelada</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Sueldo Bruto</label>
+                            <input type="number" id="edit_gross" oninput="recalcularNeto()">
+                        </div>
+                        <div class="field">
+                            <label>Bonos</label>
+                            <input type="number" id="edit_bonus" oninput="recalcularNeto()">
+                        </div>
+                    </div>
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Caja Ahorro (-)</label>
+                            <input type="number" id="edit_caja" oninput="recalcularNeto()">
+                        </div>
+                        <div class="field">
+                            <label>Desc/Falta (-)</label>
+                            <input type="number" id="edit_prestamos" oninput="recalcularNeto()">
+                        </div>
+                    </div>
+                    <div class="field" style="margin-bottom:14px;">
+                        <label>Desc/ventas (-)</label>
+                        <input type="number" id="edit_ventas" oninput="recalcularNeto()">
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:12px;">Estado de préstamo</h6>
+
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Monto Préstamo</label>
+                            <input type="number" id="edit_prestamo" readonly>
+                        </div>
+                        <div class="field">
+                            <label>Monto Restante</label>
+                            <input type="number" id="edit_restante" readonly>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Monto Abonar (-)</label>
+                            <input type="number" id="edit_montoabonar" oninput="recalcularNeto()">
+                        </div>
+                        <div class="field">
+                            <label>Intereses (-)</label>
+                            <input type="number" id="edit_intereses" oninput="recalcularNeto()">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Total Neto a Pagar</label>
+                        <input type="number" id="edit_neto" readonly style="font-weight:700;color:var(--ok);">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" onclick="guardarCambios()">💾 Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/ui-alert.js"></script>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    const modalEditar = new bootstrap.Modal(document.getElementById('modalEditar'));
+
+function buscarPorFolio() {
+    const folio = document.getElementById('inputFolio').value;
+    if (!folio) return showAlert("Por favor, ingrese un folio.", "info");
+
+    fetch(`/api/consultar-payroll/${folio}`)
+        .then(res => res.json())
+        .then(res => {
+            const cuerpo = document.getElementById('tablaCuerpo');
+            cuerpo.innerHTML = '';
+            ocultarBotonMasivo();
+
+            if (res.success) {
+                res.data.forEach(item => {
+                    const idStatus = parseInt(item.ID_PSTATUS);
+                    const esPagado = idStatus === 2;
+
+                    // Formatear fechas para que se vean limpias (DD/MM/YYYY)
+                    // Busca estas líneas y cámbialas para que coincidan con la DB
+const fPago = item.PAYMENT_DATE ? new Date(item.PAYMENT_DATE).toLocaleDateString() : '---';
+const fInicio = item.PERIOD_START ? new Date(item.PERIOD_START).toLocaleDateString() : '---'; // Cambiado de START_DATE a PERIOD_START
+const fFin = item.PERIOD_END ? new Date(item.PERIOD_END).toLocaleDateString() : '---';     // Cambiado de END_DATE a PERIOD_END
+
+                    let statusBadge = '';
+                    switch(idStatus) {
+                        case 1: statusBadge = '<span class="badge badge-info">Generada</span>'; break;
+                        case 2: statusBadge = '<span class="badge badge-ok">Pagada</span>'; break;
+                        case 3: statusBadge = '<span class="badge badge-bad">Cancelada</span>'; break;
+                        default: statusBadge = '<span class="badge badge-muted">Desconocido</span>';
+                    }
+
+                    // STATUS_PAYROLL: 0 = editable/generada, 2 = notificada y
+                    // pendiente de autorización, 1 = autorizada (final).
+                    // Solo se puede editar/seleccionar mientras esté en 0.
+                    const statusPayroll = parseInt(item.STATUS_PAYROLL) || 0;
+                    const esEditable = statusPayroll === 0;
+                    let statusPayrollBadge = '';
+                    if (statusPayroll === 2) statusPayrollBadge = '<br><span class="badge badge-warn">Pend. Autorización</span>';
+                    else if (statusPayroll === 1) statusPayrollBadge = '<br><span class="badge badge-info">Autorizada</span>';
+
+                    cuerpo.innerHTML += `
+                        <tr>
+                             ${esEditable ? `
+                            <td>
+                                <input type="checkbox" class="row-check"
+                                    value="${escapeHtml(item.ID_PAYROLL)}"
+                                    ${!esPagado ? 'disabled' : 'onclick="gestionarSeleccion()"'}>
+                            </td>` : '<td></td>'}
+                            <td>${escapeHtml(item.ID_PAYROLL)}</td>
+                            <td>${escapeHtml(item.FIRST_NAME)} ${escapeHtml(item.LAST_NAME)}</td>
+                            <td class="hint">${fPago}</td> <td class="hint">${fInicio} - ${fFin}</td> <td>${statusBadge}${statusPayrollBadge}</td>
+                            <td style="font-weight:700;">$${escapeHtml(item.NET_SALARY)}</td>
+                            ${esEditable ? `
+                            <td class="text-center">
+                                <button class="ghost" onclick="abrirModal(${JSON.stringify(item).replace(/"/g, '&quot;')})">✏️</button>
+                            </td>
+                            ` : '<td></td>'} </tr>
+                    `;
+                });
+            } else {
+                showAlert(res.message, "error");
+            }
+        })
+        .catch(err => console.error("Error:", err));
+}
+
+    // --- Lógica de Selección y Notificación ---
+
+    function gestionarSeleccion() {
+        const checks = document.querySelectorAll('.row-check:checked');
+        const btnMasivo = document.getElementById('contenedorAcciones');
+        btnMasivo.style.display = checks.length > 0 ? 'block' : 'none';
+    }
+
+    function seleccionarTodo(source) {
+        const checkboxes = document.querySelectorAll('.row-check:not(:disabled)');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+        gestionarSeleccion();
+    }
+
+    function ocultarBotonMasivo() {
+        document.getElementById('contenedorAcciones').style.display = 'none';
+        document.getElementById('checkAll').checked = false;
+    }
+
+    async function enviarSeleccionados() {
+        const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(cb => cb.value);
+
+        // El correo destino ya no se decide aquí: el servidor siempre
+        // notifica a la cuenta admin del sistema (distinta según el
+        // ambiente: Gmail en desarrollo, admin@transportesalas.net en
+        // producción), así que el mensaje no menciona una dirección fija.
+        const ok = await showConfirm(`¿Enviar comprobantes de los ${ids.length} registros seleccionados a la cuenta de notificaciones del sistema?`, {
+            title: 'Enviar notificación', confirmText: 'Enviar'
+        });
+        if (!ok) return;
+
+        fetch('/api/notificar-pago-masivo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert("Notificaciones enviadas correctamente.", "success");
+
+                // Solo los registros que el usuario seleccionó (y que ya se
+                // notificaron) pasan a "pendiente de autorización"; el resto
+                // del folio se queda como estaba.
+                actualizarPayroll(ids);
+
+            } else {
+                showAlert("Error: " + res.message, "error");
+            }
+        })
+        .catch(err => showAlert("Error de conexión al servidor.", "error"));
+    }
+
+    // --- Funciones de Edición (Modal) ---
+
+    function abrirModal(datos) {
+        document.getElementById('edit_id_payroll').value = datos.ID_PAYROLL;
+        document.getElementById('edit_nombre').value = `${datos.FIRST_NAME} ${datos.LAST_NAME}`;
+        document.getElementById('edit_status').value = datos.ID_PSTATUS;
+        document.getElementById('edit_gross').value = datos.GROSS_SALARY;
+        document.getElementById('edit_bonus').value = datos.TOTAL_BONUSES;
+        document.getElementById('edit_caja').value = datos.CASHIER_DISCOUNT;
+        document.getElementById('edit_prestamos').value = datos.DISCOUNT_LOANS_ABSENCES;
+        const monto = parseFloat(datos.MONTO_RESTANTE) || 0;
+        const calculo = monto * 0.03;
+       // document.getElementById('edit_intereses').value = datos.INTERESES;
+        document.getElementById('edit_intereses').value = calculo;
+        document.getElementById('edit_ventas').value = datos.DESCUENTO_VENTA;
+        document.getElementById('edit_neto').value = datos.NET_SALARY;
+        document.getElementById('edit_prestamo').value = datos.MONTO_PRESTAMO;
+        document.getElementById('edit_restante').value = datos.MONTO_RESTANTE;
+         document.getElementById('edit_montoabonar').value=datos.MONTO_ABONO;
+        id_prestamo = datos.ID_PRESTAMO;
+        modalEditar.show();
+        recalcularNeto();
+    }
+
+    function recalcularNeto() {
+        const gross = parseFloat(document.getElementById('edit_gross').value) || 0;
+        const bonus = parseFloat(document.getElementById('edit_bonus').value) || 0;
+        const caja = parseFloat(document.getElementById('edit_caja').value) || 0;
+        const prest = parseFloat(document.getElementById('edit_prestamos').value) || 0;
+        const interes = parseFloat(document.getElementById('edit_intereses').value) || 0;
+        const ventas = parseFloat(document.getElementById('edit_ventas').value) || 0;
+        const montoprestamo = parseFloat(document.getElementById('edit_montoabonar').value) || 0;
+        const neto = (gross + bonus) - (caja + prest + interes + ventas+montoprestamo);
+        document.getElementById('edit_neto').value = neto.toFixed(2);
+    }
+
+    let id_prestamo = 0;
+
+    function guardarCambios() {
+    // Usamos || 0 para que si el campo está vacío, mande un cero numérico
+    const data = {
+        id_payroll: document.getElementById('edit_id_payroll').value,
+        id_pstatus: document.getElementById('edit_status').value,
+        gross_salary: parseFloat(document.getElementById('edit_gross').value) || 0,
+        total_bonuses: parseFloat(document.getElementById('edit_bonus').value) || 0, // <--- Esto evita el error
+        cashier_discount: parseFloat(document.getElementById('edit_caja').value) || 0,
+        discount_loans_absences: parseFloat(document.getElementById('edit_prestamos').value) || 0,
+        interes: parseFloat(document.getElementById('edit_intereses').value) || 0,
+        ventas: parseFloat(document.getElementById('edit_ventas').value) || 0,
+        montoabonar: parseFloat(document.getElementById('edit_montoabonar').value) || 0,
+        net_salary: parseFloat(document.getElementById('edit_neto').value) || 0,
+        monto_restante: parseFloat(document.getElementById('edit_restante').value) || 0,
+        id_prestamo: id_prestamo,
+        monto_prestamo: parseFloat(document.getElementById('edit_prestamo').value) || 0,
+        folio: document.getElementById('inputFolio').value
+    };
+
+    fetch('/api/actualizar-registro-payroll', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(res => {
+        if (res.success) {
+            showAlert("¡Registro actualizado correctamente!", "success");
+            modalEditar.hide();
+            buscarPorFolio();
+        } else {
+            showAlert(res.message, "error");
+            modalEditar.hide();
+            buscarPorFolio();
+        }
+
+         document.getElementById('edit_montoabonar').value=0;
+    });
+}
+
+    function exportarExcel() {
+        const table = document.getElementById("tablaMovimientos");
+        const folio = document.getElementById("inputFolio").value;
+
+        // Verificamos que haya datos reales en la tabla
+        const rows = table.querySelectorAll('tbody tr');
+        if (rows.length === 1 && rows[0].innerText.includes("encontraron")) {
+            showAlert("No hay datos para exportar", "info");
+            return;
+        }
+
+
+ // 1. Extraemos solo las columnas que necesitamos
+    const datosFiltrados = [];
+
+    rows.forEach(row => {
+        const cells = row.cells;
+        // Supongamos que quieres: Operador (col 1), Tipo (col 2), Monto (col 5)
+        // RECUERDA: Los índices empiezan en 0
+        if(cells[5].innerText=="Pagada")
+       { datosFiltrados.push({
+            "id": cells[1].innerText,
+            "Empleado": cells[2].innerText,
+            "Fecha Pago": cells[3].innerText,
+            "Periodo": cells[4].innerText,
+            "Estado": cells[5].innerText,
+            "Neto": cells[6].innerText,
+            "Folio": folio
+        });
+    }
+    });
+
+    // 2. Creamos la hoja de trabajo (Worksheet) a partir del nuevo arreglo
+    const ws = XLSX.utils.json_to_sheet(datosFiltrados);
+
+ // 3. Creamos el libro (Workbook) y añadimos la hoja
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, folio);
+
+
+
+        // Nombre del archivo con la fecha actual
+        const nombreArchivo = `Reporte_${folio}_${new Date().toLocaleDateString()}.xlsx`;
+
+        // Descarga el archivo
+        XLSX.writeFile(wb, nombreArchivo);
+    }
+
+
+    // Recibe únicamente los ID_PAYROLL que el usuario seleccionó y notificó;
+    // antes se mandaba el folio completo y se marcaban como "pendiente de
+    // autorización" TODOS los empleados del folio, aunque solo algunos
+    // hubieran sido seleccionados.
+    async function actualizarPayroll(ids) {
+
+    const response = await fetch('/api/actualizar-payroll', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            ids: ids
+        })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+        showAlert('Nómina enviada a autorización', 'success');
+         buscarPorFolio(); // Recargar tabla
+    } else {
+        showAlert('Error: ' + data.error, 'error');
+    }
+}
+
+</script>
+
+</body>
+</html>

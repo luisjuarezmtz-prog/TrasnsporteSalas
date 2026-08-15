@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+    <script src="js/theme.js"></script>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Agenda de Viajes - Transportes Salas</title>
+
+   
+
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+
+   
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/agendaviajes.css">
+    <script src="js/ui-alert.js"></script>
+
+</head>
+
+<body>
+
+
+
+    <div class="container">
+
+        <div class="toolbar">
+
+            <a href="dashboard.html" class="btn-dashboard">
+
+                <span>←</span> &nbsp; Volver al menú
+
+            </a>
+
+
+
+            <div class="search-box">
+
+                <strong>Ir a fecha:</strong>
+
+                <input type="date" id="datepicker-ir-a">
+
+            </div>
+
+        </div>
+
+
+
+        <div id="calendar"></div>
+
+    </div>
+
+
+
+    <script>
+
+        document.addEventListener('DOMContentLoaded', function() {
+
+            const calendarEl = document.getElementById('calendar');
+
+            const datePicker = document.getElementById('datepicker-ir-a');
+
+           
+
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+
+                initialView: 'dayGridMonth',
+
+                locale: 'es',
+
+                headerToolbar: {
+
+                    left: 'prev,next today',
+
+                    center: 'title',
+
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+
+                },
+
+                buttonText: {
+
+                    today: 'Hoy',
+
+                    month: 'Mes',
+
+                    week: 'Semana',
+
+                    day: 'Día'
+
+                },
+
+
+
+                // CARGA DE DATOS DESDE EL SERVIDOR
+
+                events: function(info, successCallback, failureCallback) {
+
+                    fetch('/api/agenda') // Ruta corregida según el server.js
+
+                        .then(response => {
+
+                            if (!response.ok) throw new Error("Error al obtener datos");
+
+                            return response.json();
+
+                        })
+
+                        .then(data => {
+
+                            const eventos = data.map(viaje => {
+
+                                // Procesar fecha para evitar el desfase horario de JS
+
+                                let fechaStr = viaje.FECHA_ENTREGA;
+
+                                if (fechaStr.includes('T')) {
+
+                                    fechaStr = fechaStr.split('T')[0];
+
+                                }
+
+
+
+                                return {
+
+                                    id: viaje.ID_PURCHASE_ORDER,
+
+                                    title: `${viaje.ORDEN_COMPRA} - ${viaje.CEDIS}`,
+
+                                    start: `${fechaStr}T${viaje.HORA_ENTREGA}`,
+
+                                    extendedProps: {
+
+                                        empleado: viaje.EMPLEADO,
+
+                                        estatus: viaje.ESTATUS,
+
+                                        cedis: viaje.CEDIS,
+
+                                        hora: viaje.HORA_ENTREGA
+
+                                    },
+
+                                    // Color según estatus
+
+                                    backgroundColor: viaje.ESTATUS.toUpperCase() === 'ASIGNADO' ? '#1a73e8' : '#34a853',
+
+                                    allDay: false
+
+                                };
+
+                            });
+
+                            successCallback(eventos);
+
+                        })
+
+                        .catch(error => {
+
+                            console.error("❌ Error en calendario:", error);
+
+                            failureCallback(error);
+
+                        });
+
+                },
+
+
+
+                eventClick: function(info) {
+
+                    const props = info.event.extendedProps;
+
+                    const detalle = `📋 DETALLES DEL VIAJE\n` +
+
+                                    `---------------------------\n` +
+
+                                    `📦 ORDEN: ${info.event.title}\n` +
+
+                                    `👤 EMPLEADO: ${props.empleado || 'No asignado'}\n` +
+
+                                    `📍 CEDIS: ${props.cedis}\n` +
+
+                                    `⏰ HORA: ${props.hora}\n` +
+
+                                    `📌 ESTATUS: ${props.estatus}`;
+
+                    showAlert(detalle, "info", 6000);
+
+                }
+
+            });
+
+
+
+            calendar.render();
+
+
+
+            // Buscador de fecha
+
+            datePicker.addEventListener('change', function() {
+
+                if (this.value) {
+
+                    calendar.gotoDate(this.value);
+
+                    calendar.changeView('timeGridDay');
+
+                }
+
+            });
+
+        });
+
+    </script>
+
+</body>
+
+</html>

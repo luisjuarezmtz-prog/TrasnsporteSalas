@@ -1,0 +1,51 @@
+/* Consulta de Tarimas — tema oscuro/ámbar (hereda variables de style.css) */
+
+.container {
+    max-width: 1100px;
+    margin: auto;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 24px;
+    border-radius: 8px;
+}
+
+h2 {
+    font-family: var(--mono);
+    font-size: 15px;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--amber);
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 12px;
+    margin: 0 0 20px 0;
+}
+
+.search-box {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    align-items: center;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    padding: 16px;
+    border-radius: 6px;
+}
+
+.search-box input[type="text"] { width: 240px; }
+.search-box select { width: 200px; cursor: pointer; }
+
+.btn-search { background: var(--amber); color: #10141a; border-color: var(--amber); font-weight: 700; }
+.btn-excel { background: #1d6f42; color: white; border-color: #1d6f42; font-weight: 700; }
+.btn-excel:hover { filter: brightness(1.15); }
+.btn-home { background: transparent; }
+
+.table-container { overflow-x: auto; }
+
+.no-data {
+    text-align: center;
+    padding: 20px;
+    color: var(--ink-dim);
+}

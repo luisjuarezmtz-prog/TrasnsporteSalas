@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autorización de Nómina - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>✅ Autorización de Nómina</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<div class="panel">
+    <p class="hint" style="font-size:13px;margin-bottom:16px;">
+        Registros de nómina que ya fueron notificados y están pendientes de autorización final.
+        Si se autoriza, el registro queda cerrado. Si se rechaza, regresa a edición en Revisar Nómina.
+    </p>
+
+    <div class="panel-header">
+        <button class="ghost" onclick="cargarPendientes()">🔄 Actualizar lista</button>
+        <div id="contenedorAcciones" style="display:none;display:flex;gap:10px;">
+            <button class="ghost" style="border-color:var(--bad);color:var(--bad);" onclick="procesarSeleccionados('rechazar')">✕ Rechazar Seleccionados</button>
+            <button class="primary" onclick="procesarSeleccionados('autorizar')">✓ Autorizar Seleccionados</button>
+        </div>
+    </div>
+
+    <table id="tablaPendientes">
+        <thead>
+            <tr>
+                <th width="40"><input type="checkbox" id="checkAll" onclick="seleccionarTodo(this)"></th>
+                <th>ID</th>
+                <th>Folio</th>
+                <th>Empleado</th>
+                <th>F. Pago</th>
+                <th>Periodo</th>
+                <th>Bruto</th>
+                <th>Bonos</th>
+                <th>Caja</th>
+                <th>Préstamo</th>
+                <th>Intereses</th>
+                <th>Ventas</th>
+                <th>Neto</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            <tr><td colspan="13" class="text-center hint">Cargando registros pendientes...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    function cargarPendientes() {
+        const cuerpo = document.getElementById('tablaCuerpo');
+        cuerpo.innerHTML = '<tr><td colspan="13" class="text-center hint">Cargando registros pendientes...</td></tr>';
+        ocultarBotonMasivo();
+
+        fetch('/api/nomina-pendiente-autorizacion')
+            .then(res => res.json())
+            .then(res => {
+                cuerpo.innerHTML = '';
+
+                if (!res.success || res.data.length === 0) {
+                    cuerpo.innerHTML = '<tr><td colspan="13" class="text-center hint">No hay registros pendientes de autorización.</td></tr>';
+                    return;
+                }
+
+                res.data.forEach(item => {
+                    const fPago = item.PAYMENT_DATE ? new Date(item.PAYMENT_DATE).toLocaleDateString() : '---';
+                    const fInicio = item.PERIOD_START ? new Date(item.PERIOD_START).toLocaleDateString() : '---';
+                    const fFin = item.PERIOD_END ? new Date(item.PERIOD_END).toLocaleDateString() : '---';
+
+                    cuerpo.innerHTML += `
+                        <tr>
+                            <td><input type="checkbox" class="row-check" value="${escapeHtml(item.ID_PAYROLL)}" onclick="gestionarSeleccion()"></td>
+                            <td>${escapeHtml(item.ID_PAYROLL)}</td>
+                            <td style="font-family:var(--mono);">${escapeHtml(item.FOLIO)}</td>
+                            <td>${escapeHtml(item.FIRST_NAME)} ${escapeHtml(item.LAST_NAME)}</td>
+                            <td class="hint">${fPago}</td>
+                            <td class="hint">${fInicio} - ${fFin}</td>
+                            <td>$${escapeHtml(item.GROSS_SALARY)}</td>
+                            <td>$${escapeHtml(item.TOTAL_BONUSES)}</td>
+                            <td>$${escapeHtml(item.CASHIER_DISCOUNT)}</td>
+                            <td>$${escapeHtml(item.DISCOUNT_LOANS_ABSENCES)}</td>
+                            <td>$${escapeHtml(item.INTERESES)}</td>
+                            <td>$${escapeHtml(item.DESCUENTO_VENTA)}</td>
+                            <td style="font-weight:700;">$${escapeHtml(item.NET_SALARY)}</td>
+                        </tr>
+                    `;
+                });
+            })
+            .catch(err => {
+                console.error("Error:", err);
+                cuerpo.innerHTML = '<tr><td colspan="13" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+            });
+    }
+
+    function gestionarSeleccion() {
+        const checks = document.querySelectorAll('.row-check:checked');
+        document.getElementById('contenedorAcciones').style.display = checks.length > 0 ? 'flex' : 'none';
+    }
+
+    function seleccionarTodo(source) {
+        document.querySelectorAll('.row-check').forEach(cb => cb.checked = source.checked);
+        gestionarSeleccion();
+    }
+
+    function ocultarBotonMasivo() {
+        document.getElementById('contenedorAcciones').style.display = 'none';
+        document.getElementById('checkAll').checked = false;
+    }
+
+    async function procesarSeleccionados(accion) {
+        const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(cb => cb.value);
+        if (ids.length === 0) return;
+
+        const mensajeConfirm = accion === 'autorizar'
+            ? `¿Autorizar ${ids.length} registro(s) de nómina? Esta acción los dejará cerrados.`
+            : `¿Rechazar ${ids.length} registro(s) de nómina? Regresarán a edición en Revisar Nómina.`;
+
+        const ok = await showConfirm(mensajeConfirm, {
+            type: accion === 'autorizar' ? 'success' : 'danger',
+            title: accion === 'autorizar' ? 'Autorizar nómina' : 'Rechazar nómina',
+            confirmText: accion === 'autorizar' ? 'Autorizar' : 'Rechazar'
+        });
+        if (!ok) return;
+
+        fetch('/api/autorizar-nomina', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, accion })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+                cargarPendientes();
+            } else {
+                showAlert('Error: ' + res.message, 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    document.addEventListener('DOMContentLoaded', cargarPendientes);
+</script>
+
+</body>
+</html>

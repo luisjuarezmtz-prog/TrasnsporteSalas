@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movimiento de Viajes - Cuentas por Cobrar</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>🚚 Movimiento de Viajes</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<div class="panel">
+    <p class="hint" style="font-size:13px;margin-bottom:16px;">
+        Consulta el número y costo total de los movimientos de viaje (travels_movements) registrados en un rango de fechas.
+        Esta información alimenta la categoría "Movimientos" de la Factura CXC.
+    </p>
+
+    <div class="grid grid-3" style="margin-bottom:18px;align-items:end;">
+        <div class="field">
+            <label>Fecha Inicio</label>
+            <input type="date" id="fechaInicio">
+        </div>
+        <div class="field">
+            <label>Fecha Fin</label>
+            <input type="date" id="fechaFin">
+        </div>
+        <button class="primary" onclick="consultarMovimientos()">🔍 Consultar</button>
+    </div>
+
+    <div id="resultado" class="grid grid-2" style="display:none;">
+        <div class="stat-card">
+            <div class="stat-label">Número de Movimientos</div>
+            <div class="stat-value" id="statNumero">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Costo Total</div>
+            <div class="stat-value amber" id="statCosto">$0.00</div>
+        </div>
+    </div>
+</div>
+
+<script src="js/ui-alert.js"></script>
+<script>
+    function formatearMoneda(valor) {
+        return `$${parseFloat(valor || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function consultarMovimientos() {
+        const fechaInicio = document.getElementById('fechaInicio').value;
+        const fechaFin = document.getElementById('fechaFin').value;
+
+        if (!fechaInicio || !fechaFin) {
+            return showAlert('Selecciona fecha inicio y fecha fin.', 'info');
+        }
+        if (fechaInicio > fechaFin) {
+            return showAlert('La fecha inicio no puede ser posterior a la fecha fin.', 'info');
+        }
+
+        fetch(`/api/cxc/movimientos?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success) {
+                    return showAlert(res.message || 'Ocurrió un error.', 'error');
+                }
+                document.getElementById('statNumero').textContent = res.data.numero;
+                document.getElementById('statCosto').textContent = formatearMoneda(res.data.costo);
+                document.getElementById('resultado').style.display = 'grid';
+            })
+            .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+</script>
+
+</body>
+</html>
