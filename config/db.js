@@ -14,6 +14,10 @@ const db = mysql.createPool({
   queueLimit: 0
 });
 
+db.on('error', (err) => {
+  console.error('Error de conexión a MySQL:', err.code, err.message);
+});
+
 const dbPromesa = db.promise();
 
 module.exports = { db, dbPromesa };
