@@ -43,6 +43,18 @@
     </div>
 </div>
 
+<div class="panel">
+    <h3 style="margin-top:0;">✉️ Probar envío de correo</h3>
+    <p class="hint" style="margin-bottom:14px;">Envía un correo de prueba para verificar que la configuración SMTP del servidor esté funcionando.</p>
+    <div class="grid" style="grid-template-columns:2fr auto;gap:12px;align-items:end;">
+        <div class="field">
+            <label>Correo destinatario</label>
+            <input type="email" id="inputCorreoPrueba" placeholder="Déjalo vacío para usar el correo admin del sistema">
+        </div>
+        <button class="primary" onclick="probarEnvioCorreo()">📧 Enviar prueba</button>
+    </div>
+</div>
+
 <!-- MODAL ALTA -->
 <div class="modal fade" id="modalNuevoValor" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -76,6 +88,18 @@
         return String(str ?? '').replace(/[&<>"']/g, ch => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
         }[ch]));
+    }
+
+    function probarEnvioCorreo() {
+        const destinatario = document.getElementById('inputCorreoPrueba').value.trim();
+        fetch('/api/test-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ destinatario }),
+        })
+            .then(res => res.json())
+            .then(res => showAlert(res.message, res.success ? 'success' : 'error'))
+            .catch(err => showAlert('Error al contactar al servidor: ' + err.message, 'error'));
     }
 
     function badgeEstatusValor(status) {

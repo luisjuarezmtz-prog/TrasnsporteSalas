@@ -21,6 +21,7 @@
 const express = require('express');
 const router = express.Router();
 const { db } = require('../config/db');
+const { transporter, REMITENTE_DEFAULT, CORREO_ADMIN } = require('../config/mailer');
 
 const CATALOGOS = {
   cedis: {
@@ -220,6 +221,27 @@ router.put('/catalogos-admin/:tipo/:id/estatus', (req, res) => {
     }
     res.json({ success: true, message: status === 1 ? 'Valor activado correctamente.' : 'Valor desactivado correctamente.' });
   });
+});
+
+// --- PRUEBA DE ENVÍO DE CORREO (diagnóstico de configuración SMTP) ---
+router.post('/test-email', async (req, res) => {
+  const destinatario = (req.body.destinatario || CORREO_ADMIN || '').trim();
+  if (!destinatario) {
+    return res.status(400).json({ success: false, message: 'Falta el correo destinatario.' });
+  }
+
+  try {
+    await transporter.sendMail({
+      from: REMITENTE_DEFAULT,
+      to: destinatario,
+      subject: 'Prueba de envío de correo — Transportes Salas',
+      text: `Correo de prueba enviado el ${new Date().toLocaleString('es-MX')} para verificar la configuración SMTP.`,
+    });
+    res.json({ success: true, message: `Correo de prueba enviado a ${destinatario}.` });
+  } catch (error) {
+    console.error('Error al enviar correo de prueba:', error);
+    res.status(500).json({ success: false, message: `Error al enviar: ${error.message}` });
+  }
 });
 
 module.exports = router;
