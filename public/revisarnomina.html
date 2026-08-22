@@ -243,6 +243,11 @@ const fFin = item.PERIOD_END ? new Date(item.PERIOD_END).toLocaleDateString() : 
         });
         if (!ok) return;
 
+        // El correo es solo una notificación interna informativa: si falla
+        // (SMTP caído, etc.) NO debe impedir que la nómina pase a
+        // "pendiente de autorización", que es la acción de negocio real.
+        // Por eso actualizarPayroll(ids) se llama siempre, sin importar si
+        // el correo se pudo enviar o no.
         fetch('/api/notificar-pago-masivo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -250,19 +255,19 @@ const fFin = item.PERIOD_END ? new Date(item.PERIOD_END).toLocaleDateString() : 
         })
         .then(res => res.json())
         .then(res => {
-            if (res.success) {
-                showAlert("Notificaciones enviadas correctamente.", "success");
-
-                // Solo los registros que el usuario seleccionó (y que ya se
-                // notificaron) pasan a "pendiente de autorización"; el resto
-                // del folio se queda como estaba.
-                actualizarPayroll(ids);
-
-            } else {
-                showAlert("Error: " + res.message, "error");
+            if (!res.success) {
+                showAlert("No se pudo enviar el correo de notificación (" + res.message + "), pero la nómina se enviará a autorización de todas formas.", "error");
             }
         })
-        .catch(err => showAlert("Error de conexión al servidor.", "error"));
+        .catch(() => {
+            showAlert("No se pudo enviar el correo de notificación (error de conexión), pero la nómina se enviará a autorización de todas formas.", "error");
+        })
+        .finally(() => {
+            // Solo los registros que el usuario seleccionó pasan a
+            // "pendiente de autorización"; el resto del folio se queda
+            // como estaba.
+            actualizarPayroll(ids);
+        });
     }
 
     // --- Funciones de Edición (Modal) ---
