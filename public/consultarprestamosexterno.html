@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Préstamos - Personal Externo</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+    <div class="brand">
+        <h1>💰 Consulta de Préstamos (Personal Externo)</h1>
+        <a href="dashboard.html" class="link-plain tag">← Regresar al Dashboard</a>
+    </div>
+    <p class="hint" style="margin-top:-14px;margin-bottom:20px;">Datos obtenidos en tiempo real desde la base de datos.</p>
+
+    <!-- TARJETAS DE RESUMEN (KPIs Dinámicos) -->
+    <div class="grid grid-3" style="margin-bottom:20px;">
+        <div class="stat-card">
+            <div class="stat-label">💵 Total Prestado</div>
+            <div id="kpi-prestado" class="stat-value">$0.00</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">📈 Total Recuperado</div>
+            <div id="kpi-abonado" class="stat-value ok">$0.00</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">⏳ Saldo por Cobrar</div>
+            <div id="kpi-restante" class="stat-value amber">$0.00</div>
+        </div>
+    </div>
+
+    <!-- TABLA PRINCIPAL -->
+    <div class="panel">
+        <table>
+            <thead>
+                <tr>
+                    <th>Folio</th>
+                    <th>Personal Externo</th>
+                    <th class="text-right">Monto Préstamo</th>
+                    <th class="text-right">Monto Abonado</th>
+                    <th class="text-right">Monto Restante</th>
+                    <th>Progreso</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-prestamos">
+                <tr>
+                    <td colspan="7" class="text-center hint">Cargando datos desde la base de datos...</td>
+                </tr>
+            </tbody>
+        </table>
+        <p class="hint" id="contador-registros" style="margin-top:10px;">Mostrando 0 préstamos registrados</p>
+    </div>
+
+    <!-- PANTALLA MODAL DE HISTORIAL DE ABONOS -->
+    <div id="modal-abonos" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width:800px;">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">🕘 Historial de Abonos</div>
+                    <p class="hint" style="margin:4px 0 0 0;">Personal Externo: <span id="modal-empleado">---</span></p>
+                </div>
+                <button onclick="cerrarModal()" class="btn-close" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body" style="max-height:400px;overflow-y:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Evento</th>
+                            <th>Folio</th>
+                            <th>Fecha / Hora</th>
+                            <th class="text-right">Monto</th>
+                            <th class="text-right">Restante</th>
+                            <th>Usuario</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-abonos-body"></tbody>
+                </table>
+            </div>
+
+            <div class="modal-footer">
+                <button onclick="cerrarModal()" class="ghost">Cerrar Ventana</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA MODAL PARA REGISTRAR UN ABONO MANUAL -->
+    <div id="modal-registrar-abono" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">💵 Registrar Abono</div>
+                    <p class="hint" style="margin:4px 0 0 0;">Personal Externo: <span id="abono-externo">---</span></p>
+                </div>
+                <button onclick="cerrarModalAbono()" class="btn-close" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="hint" style="margin:0 0 10px;">Saldo restante actual: <b id="abono-saldo-restante">$0.00</b></p>
+                <div class="field">
+                    <label for="abono-monto">Monto a Abonar ($)</label>
+                    <input type="number" id="abono-monto" min="1" step="1" placeholder="Ej. 500">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button onclick="cerrarModalAbono()" class="ghost">Cancelar</button>
+                <button onclick="confirmarAbono()" class="primary">Guardar Abono</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LÓGICA DE CONEXIÓN -->
+    <script>
+        // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
+        const formatMoney = (amount) => {
+            return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
+        };
+
+        let idPrestamoParaAbono = null;
+
+        async function cargarPrestamos() {
+            const tbody = document.getElementById('tabla-prestamos');
+
+            try {
+                const response = await fetch('/api/prestamos-externos-consulta');
+
+                if (!response.ok) {
+                    throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
+                }
+
+                const prestamos = await response.json();
+                tbody.innerHTML = '';
+
+                if (!prestamos || prestamos.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center hint">
+                                No se encontraron préstamos registrados en la base de datos.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                let totalPrestado = 0;
+                let totalAbonado = 0;
+                let totalRestante = 0;
+
+                prestamos.forEach(p => {
+                    const mPrestamo = parseFloat(p.MONTO_PRESTAMO) || 0;
+                    const mAbonado = parseFloat(p.MONTO_ABONADO) || 0;
+                    const mRestante = parseFloat(p.MONTO_RESTANTE) || 0;
+
+                    totalPrestado += mPrestamo;
+                    totalAbonado += mAbonado;
+                    totalRestante += mRestante;
+
+                    const porcentaje = mPrestamo > 0 ? Math.round((mAbonado / mPrestamo) * 100) : 0;
+
+                    let claseRestante = 'badge-warn';
+                    let claseBarra = '';
+
+                    if (mRestante <= 0) {
+                        claseRestante = 'badge-muted';
+                        claseBarra = 'ok';
+                    } else if (mAbonado === 0) {
+                        claseRestante = 'badge-bad';
+                    }
+
+                    const nombreExterno = (p.EXTERNO || 'SIN REGISTRO ASIGNADO').replace(/'/g, "\\'");
+
+                    const fila = `
+                        <tr>
+                            <td style="font-family:var(--mono);font-weight:700;">${escapeHtml(p.FOLIO || 'N/A')}</td>
+                            <td style="text-transform:uppercase;">${escapeHtml(p.EXTERNO || 'SIN REGISTRO ASIGNADO')}</td>
+                            <td class="text-right">${formatMoney(mPrestamo)}</td>
+                            <td class="text-right" style="color:var(--ok);">${formatMoney(mAbonado)}</td>
+                            <td class="text-right"><span class="badge ${claseRestante}">${formatMoney(mRestante)}</span></td>
+                            <td style="width:160px;">
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <div class="progress-track" style="flex:1;">
+                                        <div class="progress-fill ${claseBarra}" style="width:${porcentaje}%;"></div>
+                                    </div>
+                                    <span class="hint" style="margin:0;">${porcentaje}%</span>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <button title="Registrar abono" onclick="abrirModalAbono('${p.ID_PRESTAMO}', '${nombreExterno}', ${mRestante})" class="ghost">💵</button>
+                                <button title="Ver historial" onclick="abrirModalAbonos('${p.ID_PRESTAMO}', '${nombreExterno}')" class="ghost">👁️</button>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += fila;
+                });
+
+                document.getElementById('kpi-prestado').innerText = formatMoney(totalPrestado);
+                document.getElementById('kpi-abonado').innerText = formatMoney(totalAbonado);
+                document.getElementById('kpi-restante').innerText = formatMoney(totalRestante);
+
+                document.getElementById('contador-registros').innerText = `Mostrando ${prestamos.length} préstamos registrados`;
+
+            } catch (error) {
+                console.error("Detalle del fallo en frontend:", error);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center" style="color:var(--bad);">
+                            ⚠️ Error de comunicación: No se pudo cargar la información.<br>
+                            <span class="hint">${escapeHtml(error.message)}</span>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        async function abrirModalAbonos(idPrestamo, externo) {
+            const modal = document.getElementById('modal-abonos');
+            const tbodyAbonos = document.getElementById('tabla-abonos-body');
+            document.getElementById('modal-empleado').innerText = externo;
+
+            tbodyAbonos.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center hint">Buscando historial en tiempo real...</td>
+                </tr>
+            `;
+
+            modal.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`/api/abonos-externos?id_prestamo=${idPrestamo}`);
+
+                if (!response.ok) throw new Error("Fallo al consultar el historial.");
+
+                const eventos = await response.json();
+                tbodyAbonos.innerHTML = '';
+
+                if (!eventos || eventos.length === 0) {
+                    tbodyAbonos.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center hint">
+                                Este registro no cuenta con historial todavía.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                eventos.forEach(ev => {
+                    const fechaLegible = ev.FECHA_CREACION ? new Date(ev.FECHA_CREACION).toLocaleString('es-MX') : 'N/A';
+                    const esCerrado = Number(ev.ESTATUS) === 0;
+                    const esPrestamo = ev.TIPO === 'PRESTAMO';
+
+                    const badgeFolio = esCerrado
+                        ? `<span class="hint" style="display:block;">(cerrado / unificado)</span>`
+                        : `<span class="hint" style="display:block;color:var(--ok);">(activo)</span>`;
+
+                    const badgeEvento = esPrestamo
+                        ? `<span class="badge badge-info">Préstamo otorgado</span>`
+                        : `<span class="badge badge-ok">Abono</span>`;
+
+                    const montoTexto = (esPrestamo ? '+ ' : '- ') + formatMoney(parseFloat(ev.MONTO) || 0);
+                    const montoClase = esPrestamo ? 'color:var(--amber);' : 'color:var(--ok);';
+                    const restanteTexto = ev.MONTO_RESTANTE === null || ev.MONTO_RESTANTE === undefined
+                        ? '—'
+                        : formatMoney(parseFloat(ev.MONTO_RESTANTE) || 0);
+
+                    const fila = `
+                        <tr>
+                            <td style="font-family:var(--mono);color:var(--ink-dim);">#${escapeHtml(ev.ID)}</td>
+                            <td>${badgeEvento}</td>
+                            <td style="font-family:var(--mono);">${escapeHtml(ev.FOLIO || 'N/A')}${badgeFolio}</td>
+                            <td>${escapeHtml(fechaLegible)}</td>
+                            <td class="text-right" style="font-weight:700;${montoClase}">${montoTexto}</td>
+                            <td class="text-right">${restanteTexto}</td>
+                            <td><span class="badge badge-muted">${escapeHtml(ev.USUARIO || 'Sistema')}</span></td>
+                        </tr>
+                    `;
+                    tbodyAbonos.innerHTML += fila;
+                });
+
+            } catch (error) {
+                console.error("Error cargando historial:", error);
+                tbodyAbonos.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center" style="color:var(--bad);">
+                            No se pudo sincronizar el historial en este momento.
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function cerrarModal() {
+            document.getElementById('modal-abonos').classList.add('hidden');
+        }
+
+        // ───────────────────────── REGISTRAR ABONO MANUAL ─────────────────────────
+        function abrirModalAbono(idPrestamo, externo, saldoRestante) {
+            idPrestamoParaAbono = idPrestamo;
+            document.getElementById('abono-externo').innerText = externo;
+            document.getElementById('abono-saldo-restante').innerText = formatMoney(saldoRestante);
+            document.getElementById('abono-monto').value = '';
+            document.getElementById('modal-registrar-abono').classList.remove('hidden');
+        }
+
+        function cerrarModalAbono() {
+            document.getElementById('modal-registrar-abono').classList.add('hidden');
+            idPrestamoParaAbono = null;
+        }
+
+        function confirmarAbono() {
+            const monto = document.getElementById('abono-monto').value;
+            if (!monto || parseFloat(monto) <= 0) {
+                return showAlert('Ingresa un monto válido.', 'info');
+            }
+
+            const usuarioActivo = localStorage.getItem('username') || 'Sistema';
+
+            fetch(`/api/prestamos-externos/${idPrestamoParaAbono}/abono`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ monto, username: usuarioActivo })
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    showAlert(res.message, 'success');
+                    cerrarModalAbono();
+                    cargarPrestamos();
+                } else {
+                    showAlert(res.message || 'Ocurrió un error.', 'error');
+                }
+            })
+            .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+        }
+
+        window.onload = () => {
+            cargarPrestamos();
+        };
+    </script>
+</body>
+</html>

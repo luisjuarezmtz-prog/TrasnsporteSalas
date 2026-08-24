@@ -42,6 +42,16 @@
             </div>
         </div>
 
+        <div id="grupo-personal-externo">
+            <button class="dropdown-btn">👷 Personal Externo</button>
+            <div class="dropdown-container">
+                <button class="tab-btn" id="sub-personalexterno" onclick="window.location.href='personalexterno.html'">👷 Alta / Baja / Cambio</button>
+                <button class="tab-btn" id="sub-regprestamosexterno" onclick="window.location.href='regprestamosexterno.html'">🪙 Reg. Préstamos</button>
+                <button class="tab-btn" id="sub-consultarprestamosexterno" onclick="window.location.href='consultarprestamosexterno.html'">💸 Consultar Préstamos</button>
+                <button class="tab-btn" id="sub-cajaahorroexterno" onclick="window.location.href='cajaahorroexterno.html'">💸 Caja Ahorro</button>
+            </div>
+        </div>
+
         <div id="grupo-nomina">
             <button class="dropdown-btn">💵 Nómina y Préstamos</button>
             <div class="dropdown-container">
@@ -129,7 +139,7 @@
 
                     // Todos los grupos del sidebar que están sujetos a permisos
                     // (deben coincidir con MODULE_KEY en c_system_modules).
-                    const grupos = ['grupo-viajes', 'grupo-tarimas', 'grupo-empleados', 'grupo-nomina', 'grupo-cxc', 'grupo-cajas', 'grupo-admin'];
+                    const grupos = ['grupo-viajes', 'grupo-tarimas', 'grupo-empleados', 'grupo-personal-externo', 'grupo-nomina', 'grupo-cxc', 'grupo-cajas', 'grupo-admin'];
 
                     grupos.forEach(idGrupo => {
                         const el = document.getElementById(idGrupo);

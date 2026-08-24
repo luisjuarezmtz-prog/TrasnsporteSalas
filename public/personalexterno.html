@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Externo - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>👷 Personal Externo</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<div class="panel">
+    <div class="grid" style="grid-template-columns:2fr 1fr auto auto;gap:12px;align-items:end;margin-bottom:18px;">
+        <div class="field">
+            <label>Buscar</label>
+            <input type="text" id="inputBusqueda" placeholder="Nombre, apellido o RFC">
+        </div>
+        <div class="field">
+            <label>Estatus</label>
+            <select id="selectEstatus">
+                <option value="1" selected>Activos</option>
+                <option value="0">Inactivos (baja)</option>
+                <option value="todos">Todos</option>
+            </select>
+        </div>
+        <button class="primary" onclick="cargarPersonalExterno()">🔍 Buscar</button>
+        <button class="primary" onclick="abrirModalAlta()">➕ Nuevo Registro</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre completo</th>
+                <th>RFC</th>
+                <th>Teléfono</th>
+                <th>Estatus</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            <tr><td colspan="6" class="text-center hint">Cargando registros...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- MODAL ALTA / EDICIÓN -->
+<div class="modal fade" id="modalExterno" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloModalExterno">➕ Nuevo Registro</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formExterno">
+                    <input type="hidden" id="edit_id">
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:14px;">Datos Personales</h6>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Nombre(s) *</label>
+                            <input type="text" id="first_name" required>
+                        </div>
+                        <div class="field">
+                            <label>Apellido Paterno *</label>
+                            <input type="text" id="parental_last" required>
+                        </div>
+                        <div class="field">
+                            <label>Apellido Materno</label>
+                            <input type="text" id="mother_last">
+                        </div>
+                    </div>
+                    <div class="grid grid-4" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Género</label>
+                            <select id="id_gender">
+                                <option value="">-- Seleccione --</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Fecha de Nacimiento</label>
+                            <input type="date" id="birthday">
+                        </div>
+                        <div class="field">
+                            <label>Lugar de Nacimiento</label>
+                            <input type="text" id="birthplace">
+                        </div>
+                        <div class="field">
+                            <label>Correo</label>
+                            <input type="email" id="mail">
+                        </div>
+                    </div>
+                    <div class="grid grid-2" style="margin-bottom:8px;">
+                        <div class="field">
+                            <label>RFC</label>
+                            <input type="text" id="rfc" maxlength="13" style="text-transform:uppercase;">
+                        </div>
+                        <div class="field">
+                            <label>CURP</label>
+                            <input type="text" id="curp" maxlength="18" style="text-transform:uppercase;">
+                        </div>
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:18px 0 14px;">Domicilio</h6>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Estado</label>
+                            <input type="text" id="state">
+                        </div>
+                        <div class="field">
+                            <label>Ciudad</label>
+                            <input type="text" id="city">
+                        </div>
+                        <div class="field">
+                            <label>Colonia</label>
+                            <input type="text" id="colonia">
+                        </div>
+                    </div>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field" style="grid-column:span 1;">
+                            <label>Calle</label>
+                            <input type="text" id="street">
+                        </div>
+                        <div class="field">
+                            <label>No. Exterior</label>
+                            <input type="text" id="exterior_number">
+                        </div>
+                        <div class="field">
+                            <label>No. Interior</label>
+                            <input type="text" id="interior_number">
+                        </div>
+                    </div>
+                    <div class="grid grid-3" style="margin-bottom:8px;">
+                        <div class="field">
+                            <label>Código Postal</label>
+                            <input type="number" id="post_code">
+                        </div>
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:18px 0 14px;">Contacto</h6>
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Teléfono Celular</label>
+                            <input type="text" id="cell_phone" maxlength="15">
+                        </div>
+                        <div class="field">
+                            <label>Teléfono de Casa</label>
+                            <input type="text" id="home_phone" maxlength="15">
+                        </div>
+                    </div>
+                    <div class="grid grid-2">
+                        <div class="field">
+                            <label>Contacto de Emergencia</label>
+                            <input type="text" id="emergency_contact">
+                        </div>
+                        <div class="field">
+                            <label>Teléfono de Emergencia</label>
+                            <input type="text" id="emergency_number" maxlength="12">
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Cuentas bancarias y documentos solo aplican a un registro que ya
+                     existe (necesitan su ID_EXTERNO); se muestran siempre, pero
+                     permanecen deshabilitadas hasta que se guarde por primera vez
+                     el formulario de arriba. -->
+                <p id="avisoGuardarPrimero" class="hint" style="margin:18px 0 0;">
+                    Guarda los datos generales para poder agregar cuentas bancarias y documentos.
+                </p>
+
+                <div id="seccionesExtra">
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:22px 0 14px;">Cuentas Bancarias</h6>
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="panel" style="margin-bottom:0;padding:14px 16px;">
+                            <p class="hint" style="margin:0 0 10px;text-transform:uppercase;font-family:var(--mono);color:var(--ink);">Principal</p>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>No. de Cuenta</label>
+                                <input type="text" id="principal_account_number">
+                            </div>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>No. de Tarjeta</label>
+                                <input type="text" id="principal_card_number" maxlength="19">
+                            </div>
+                            <div class="field">
+                                <label>CLABE Interbancaria</label>
+                                <input type="text" id="principal_clabe" maxlength="18">
+                            </div>
+                        </div>
+                        <div class="panel" style="margin-bottom:0;padding:14px 16px;">
+                            <p class="hint" style="margin:0 0 10px;text-transform:uppercase;font-family:var(--mono);color:var(--ink);">Provisional</p>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>No. de Cuenta</label>
+                                <input type="text" id="provisional_account_number">
+                            </div>
+                            <div class="field" style="margin-bottom:10px;">
+                                <label>No. de Tarjeta</label>
+                                <input type="text" id="provisional_card_number" maxlength="19">
+                            </div>
+                            <div class="field">
+                                <label>CLABE Interbancaria</label>
+                                <input type="text" id="provisional_clabe" maxlength="18">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="actions" style="margin-bottom:8px;">
+                        <button type="button" class="ghost" onclick="guardarCuentasBancarias()">💾 Guardar Cuentas Bancarias</button>
+                    </div>
+
+                    <h6 style="font-family:var(--mono);font-size:12px;text-transform:uppercase;color:var(--amber);border-bottom:1px solid var(--line);padding-bottom:6px;margin:22px 0 14px;">Documentos</h6>
+                    <div class="grid" style="grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin-bottom:14px;">
+                        <div class="field">
+                            <label>Tipo de Documento</label>
+                            <select id="select_tipo_documento">
+                                <option value="">-- Seleccione --</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Archivo (PDF, JPG o PNG)</label>
+                            <input type="file" id="input_documento" accept="application/pdf,image/png,image/jpeg">
+                        </div>
+                        <button type="button" class="ghost" onclick="agregarDocumento()">➕ Agregar</button>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Archivo</th>
+                                <th>Fecha</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaDocumentosCuerpo">
+                            <tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" onclick="guardarExterno()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    const modalExterno = new bootstrap.Modal(document.getElementById('modalExterno'));
+    let catalogos = { generos: [], tiposDocumento: [] };
+
+    async function cargarCatalogos() {
+        try {
+            const res = await fetch('/api/personal-externo-catalogos');
+            const data = await res.json();
+            if (!data.success) return;
+            catalogos = data;
+
+            llenarSelect('id_gender', catalogos.generos, 'ID_GENDER', 'GENDER_NAME');
+            llenarSelect('select_tipo_documento', catalogos.tiposDocumento, 'ID_DOCUMENT_TYPE', 'DOCUMENT_TYPE_NAME');
+        } catch (error) {
+            console.error('Error al cargar catálogos:', error);
+        }
+    }
+
+    function llenarSelect(idSelect, filas, campoId, campoNombre) {
+        const select = document.getElementById(idSelect);
+        filas.forEach(fila => {
+            const option = document.createElement('option');
+            option.value = fila[campoId];
+            option.textContent = fila[campoNombre];
+            select.appendChild(option);
+        });
+    }
+
+    function cargarPersonalExterno() {
+        const estatus = document.getElementById('selectEstatus').value;
+        const busqueda = document.getElementById('inputBusqueda').value.trim();
+        const tbody = document.getElementById('tablaCuerpo');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center hint">Cargando registros...</td></tr>';
+
+        const params = new URLSearchParams();
+        if (estatus) params.set('estatus', estatus);
+        if (busqueda) params.set('busqueda', busqueda);
+
+        fetch(`/api/personal-externo-consulta?${params.toString()}`)
+            .then(res => res.json())
+            .then(res => {
+                tbody.innerHTML = '';
+
+                if (!res.success || res.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center hint">No se encontraron registros.</td></tr>';
+                    return;
+                }
+
+                res.data.forEach(ext => {
+                    const activo = parseInt(ext.STATUS) === 1;
+                    const badgeEstatus = activo
+                        ? '<span class="badge badge-ok">Activo</span>'
+                        : '<span class="badge badge-muted">Baja</span>';
+                    const nombreCompleto = `${ext.FIRST_NAME || ''} ${ext.MIDDLE_NAME || ''} ${ext.PARENTAL_LAST || ''} ${ext.MOTHER_LAST || ''}`.replace(/\s+/g, ' ').trim();
+
+                    const botonEstatus = activo
+                        ? `<button class="ghost" style="color:var(--bad);" title="Dar de baja" onclick="cambiarEstatus(${ext.ID_EXTERNO}, 0)">🚫</button>`
+                        : `<button class="ghost" style="color:var(--ok);" title="Reactivar" onclick="cambiarEstatus(${ext.ID_EXTERNO}, 1)">✅</button>`;
+
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td>${escapeHtml(ext.ID_EXTERNO)}</td>
+                        <td>${escapeHtml(nombreCompleto)}</td>
+                        <td>${escapeHtml(ext.RFC || '—')}</td>
+                        <td>${escapeHtml(ext.CELL_PHONE || '—')}</td>
+                        <td>${badgeEstatus}</td>
+                        <td class="text-center">
+                            <button class="ghost" title="Editar" onclick="abrirModalEdicion(${ext.ID_EXTERNO})">✏️</button>
+                            ${botonEstatus}
+                        </td>
+                    `;
+                    tbody.appendChild(fila);
+                });
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+            });
+    }
+
+    function limpiarFormulario() {
+        document.getElementById('formExterno').reset();
+        document.getElementById('edit_id').value = '';
+        document.getElementById('input_documento').value = '';
+        document.getElementById('principal_account_number').value = '';
+        document.getElementById('principal_card_number').value = '';
+        document.getElementById('principal_clabe').value = '';
+        document.getElementById('provisional_account_number').value = '';
+        document.getElementById('provisional_card_number').value = '';
+        document.getElementById('provisional_clabe').value = '';
+        document.getElementById('tablaDocumentosCuerpo').innerHTML = '<tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>';
+    }
+
+    // Las secciones de cuentas/documentos siempre se ven, pero solo se
+    // pueden usar cuando el registro ya existe (necesitan su ID_EXTERNO
+    // para guardar), así que mientras tanto se deshabilitan sus controles.
+    function mostrarSeccionesExtra(habilitar) {
+        const contenedor = document.getElementById('seccionesExtra');
+        contenedor.querySelectorAll('input, select, button').forEach(el => {
+            el.disabled = !habilitar;
+        });
+        contenedor.style.opacity = habilitar ? '1' : '0.5';
+        document.getElementById('avisoGuardarPrimero').style.display = habilitar ? 'none' : 'block';
+    }
+
+    function abrirModalAlta() {
+        limpiarFormulario();
+        mostrarSeccionesExtra(false);
+        document.getElementById('tituloModalExterno').innerHTML = '➕ Nuevo Registro';
+        modalExterno.show();
+    }
+
+    async function abrirModalEdicion(id) {
+        try {
+            const res = await fetch(`/api/personal-externo/${id}/detalle`);
+            const data = await res.json();
+            if (!data.success) return showAlert(data.message || 'No se pudo cargar el registro.', 'error');
+
+            const ext = data.data;
+            limpiarFormulario();
+            document.getElementById('edit_id').value = ext.ID_EXTERNO;
+            document.getElementById('first_name').value = ext.FIRST_NAME || '';
+            document.getElementById('parental_last').value = ext.PARENTAL_LAST || '';
+            document.getElementById('mother_last').value = ext.MOTHER_LAST || '';
+            document.getElementById('id_gender').value = ext.ID_GENDER || '';
+            document.getElementById('birthday').value = ext.BIRTHDAY ? ext.BIRTHDAY.split('T')[0] : '';
+            document.getElementById('birthplace').value = ext.BIRTHPLACE || '';
+            document.getElementById('mail').value = ext.MAIL || '';
+            document.getElementById('rfc').value = ext.RFC || '';
+            document.getElementById('curp').value = ext.CURP || '';
+            document.getElementById('state').value = ext.STATE || '';
+            document.getElementById('city').value = ext.CITY || '';
+            document.getElementById('colonia').value = ext.COLONIA || '';
+            document.getElementById('street').value = ext.STREET || '';
+            document.getElementById('exterior_number').value = ext.EXTERIOR_NUMBER || '';
+            document.getElementById('interior_number').value = ext.INTERIOR_NUMBER || '';
+            document.getElementById('post_code').value = ext.POST_CODE || '';
+            document.getElementById('cell_phone').value = ext.CELL_PHONE || '';
+            document.getElementById('home_phone').value = ext.HOME_PHONE || '';
+            document.getElementById('emergency_contact').value = ext.EMERGENCY_CONTACT || '';
+            document.getElementById('emergency_number').value = ext.EMERGENCY_NUMBER || '';
+
+            mostrarSeccionesExtra(true);
+            cargarCuentasBancarias(ext.ID_EXTERNO);
+            cargarDocumentos(ext.ID_EXTERNO);
+
+            document.getElementById('tituloModalExterno').innerHTML = '✏️ Editar Registro';
+            modalExterno.show();
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('Error al conectar con el servidor.', 'error');
+        }
+    }
+
+    function guardarExterno() {
+        const id = document.getElementById('edit_id').value;
+        const esEdicion = id !== '';
+
+        const data = {
+            first_name: document.getElementById('first_name').value.trim(),
+            parental_last: document.getElementById('parental_last').value.trim(),
+            mother_last: document.getElementById('mother_last').value.trim(),
+            id_gender: document.getElementById('id_gender').value || null,
+            birthday: document.getElementById('birthday').value || null,
+            birthplace: document.getElementById('birthplace').value.trim(),
+            mail: document.getElementById('mail').value.trim(),
+            rfc: document.getElementById('rfc').value.trim().toUpperCase(),
+            curp: document.getElementById('curp').value.trim().toUpperCase(),
+            state: document.getElementById('state').value.trim(),
+            city: document.getElementById('city').value.trim(),
+            colonia: document.getElementById('colonia').value.trim(),
+            street: document.getElementById('street').value.trim(),
+            exterior_number: document.getElementById('exterior_number').value.trim(),
+            interior_number: document.getElementById('interior_number').value.trim(),
+            post_code: document.getElementById('post_code').value || null,
+            cell_phone: document.getElementById('cell_phone').value.trim(),
+            home_phone: document.getElementById('home_phone').value.trim(),
+            emergency_contact: document.getElementById('emergency_contact').value.trim(),
+            emergency_number: document.getElementById('emergency_number').value.trim()
+        };
+
+        if (!data.first_name || !data.parental_last) {
+            return showAlert('Nombre y Apellido Paterno son obligatorios.', 'info');
+        }
+
+        const url = esEdicion ? `/api/personal-externo/${id}` : '/api/personal-externo';
+        const metodo = esEdicion ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: metodo,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (!res.success) {
+                return showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+
+            if (esEdicion) {
+                showAlert(res.message, 'success');
+                modalExterno.hide();
+                cargarPersonalExterno();
+                return;
+            }
+
+            // Alta: el registro recién creado ya tiene ID_EXTERNO, así que
+            // dejamos el modal abierto (ahora en modo edición) para poder
+            // agregar cuentas bancarias y documentos de una vez.
+            showAlert('Registro creado. Ya puedes agregar sus cuentas bancarias y documentos.', 'success', 3000);
+            document.getElementById('edit_id').value = res.id_externo;
+            document.getElementById('tituloModalExterno').innerHTML = '✏️ Editar Registro';
+            mostrarSeccionesExtra(true);
+            cargarDocumentos(res.id_externo);
+            cargarPersonalExterno();
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    async function cambiarEstatus(id, nuevoEstatus) {
+        const mensaje = nuevoEstatus === 1
+            ? '¿Reactivar este registro?'
+            : '¿Dar de baja este registro?';
+
+        const ok = await showConfirm(mensaje, {
+            type: nuevoEstatus === 1 ? 'success' : 'danger',
+            title: nuevoEstatus === 1 ? 'Reactivar registro' : 'Dar de baja',
+            confirmText: nuevoEstatus === 1 ? 'Reactivar' : 'Dar de baja'
+        });
+        if (!ok) return;
+
+        fetch(`/api/personal-externo/${id}/estatus`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: nuevoEstatus })
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+                cargarPersonalExterno();
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    // ───────────────────────── CUENTAS BANCARIAS ─────────────────────────
+    function cargarCuentasBancarias(id) {
+        fetch(`/api/personal-externo/${id}/cuentas-bancarias`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success) return;
+                const { principal, provisional } = res.data;
+                document.getElementById('principal_account_number').value = principal ? (principal.ACCOUNT_NUMBER || '') : '';
+                document.getElementById('principal_card_number').value = principal ? (principal.CARD_NUMBER || '') : '';
+                document.getElementById('principal_clabe').value = principal ? (principal.CLABE || '') : '';
+                document.getElementById('provisional_account_number').value = provisional ? (provisional.ACCOUNT_NUMBER || '') : '';
+                document.getElementById('provisional_card_number').value = provisional ? (provisional.CARD_NUMBER || '') : '';
+                document.getElementById('provisional_clabe').value = provisional ? (provisional.CLABE || '') : '';
+            })
+            .catch(err => console.error('Error al cargar cuentas bancarias:', err));
+    }
+
+    function guardarCuentasBancarias() {
+        const id = document.getElementById('edit_id').value;
+        const data = {
+            principal: {
+                account_number: document.getElementById('principal_account_number').value.trim(),
+                card_number: document.getElementById('principal_card_number').value.trim(),
+                clabe: document.getElementById('principal_clabe').value.trim()
+            },
+            provisional: {
+                account_number: document.getElementById('provisional_account_number').value.trim(),
+                card_number: document.getElementById('provisional_card_number').value.trim(),
+                clabe: document.getElementById('provisional_clabe').value.trim()
+            }
+        };
+
+        fetch(`/api/personal-externo/${id}/cuentas-bancarias`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                showAlert(res.message, 'success');
+            } else {
+                showAlert(res.message || 'Ocurrió un error.', 'error');
+            }
+        })
+        .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    // ───────────────────────── DOCUMENTOS ─────────────────────────
+    function formatearFecha(fechaIso) {
+        if (!fechaIso) return '—';
+        const f = new Date(fechaIso);
+        return f.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    }
+
+    function cargarDocumentos(id) {
+        const tbody = document.getElementById('tablaDocumentosCuerpo');
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center hint">Cargando documentos...</td></tr>';
+
+        fetch(`/api/personal-externo/${id}/documentos`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success || res.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                res.data.forEach(docu => {
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td>${escapeHtml(docu.DOCUMENT_TYPE_NAME)}</td>
+                        <td><a href="${docu.FILE_PATH}" target="_blank" rel="noopener">${escapeHtml(docu.FILE_NAME)}</a></td>
+                        <td>${formatearFecha(docu.UPLOAD_DATE)}</td>
+                        <td class="text-center">
+                            <button class="ghost" style="color:var(--bad);" title="Eliminar" onclick="eliminarDocumento(${docu.ID_DOCUMENT}, ${id})">🗑️</button>
+                        </td>
+                    `;
+                    tbody.appendChild(fila);
+                });
+            })
+            .catch(err => {
+                console.error('Error al cargar documentos:', err);
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+            });
+    }
+
+    function agregarDocumento() {
+        const id = document.getElementById('edit_id').value;
+        const idTipo = document.getElementById('select_tipo_documento').value;
+        const archivo = document.getElementById('input_documento').files[0];
+
+        if (!idTipo) return showAlert('Selecciona el tipo de documento.', 'info');
+        if (!archivo) return showAlert('Selecciona un archivo.', 'info');
+
+        const formData = new FormData();
+        formData.append('documento', archivo);
+        formData.append('id_document_type', idTipo);
+
+        fetch(`/api/personal-externo/${id}/documentos`, { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    showAlert(res.message, 'success');
+                    document.getElementById('select_tipo_documento').value = '';
+                    document.getElementById('input_documento').value = '';
+                    cargarDocumentos(id);
+                } else {
+                    showAlert(res.message || 'Ocurrió un error.', 'error');
+                }
+            })
+            .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    async function eliminarDocumento(idDocumento, idExterno) {
+        const ok = await showConfirm('¿Eliminar este documento? Esta acción no se puede deshacer.', {
+            type: 'danger', title: 'Eliminar documento', confirmText: 'Eliminar'
+        });
+        if (!ok) return;
+
+        fetch(`/api/personal-externo/documentos/${idDocumento}`, { method: 'DELETE' })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    showAlert(res.message, 'success');
+                    cargarDocumentos(idExterno);
+                } else {
+                    showAlert(res.message || 'Ocurrió un error.', 'error');
+                }
+            })
+            .catch(() => showAlert('Error de conexión al servidor.', 'error'));
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        cargarCatalogos();
+        cargarPersonalExterno();
+    });
+</script>
+
+</body>
+</html>

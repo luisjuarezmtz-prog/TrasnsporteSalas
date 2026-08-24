@@ -67,6 +67,13 @@ const CATALOGOS = {
     nombreColumna: 'DOCUMENT_TYPE_NAME',
     campos: [],
   },
+  tipos_documento_externo: {
+    label: 'Tipos de Documento (Personal Externo)',
+    tabla: 'c_document_types_externo',
+    idColumna: 'ID_DOCUMENT_TYPE',
+    nombreColumna: 'DOCUMENT_TYPE_NAME',
+    campos: [],
+  },
   tipos_empleado: {
     label: 'Tipos de Empleado',
     tabla: 'c_employee_types',

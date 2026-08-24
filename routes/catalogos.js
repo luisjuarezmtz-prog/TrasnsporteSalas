@@ -27,6 +27,13 @@ router.get('/empleados_operadores', (req, res) => {
   });
 });
 
+router.get('/personal-externo', (req, res) => {
+  db.query("SELECT ID_EXTERNO, TRIM(CONCAT_WS(' ', FIRST_NAME, MIDDLE_NAME, PARENTAL_LAST)) AS NAME FROM personal_externo WHERE STATUS = 1 ORDER BY FIRST_NAME ASC", (err, results) => {
+    if (err) return res.status(500).send(err);
+    res.json(results);
+  });
+});
+
 router.get('/estatus', (req, res) => {
   db.query('SELECT ID_STATUS_ORDER, STATUS_NAME FROM status_orders ORDER BY STATUS_NAME ASC', (err, results) => {
     if (err) return res.status(500).send(err);

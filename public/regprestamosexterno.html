@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Préstamos - Personal Externo</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>Registrar Préstamo (Personal Externo)</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver al menú</a>
+</div>
+
+<div class="panel" style="max-width:480px;margin:0 auto;">
+    <form id="formPrestamo">
+
+        <!-- Folio Autogenerado -->
+        <div class="field" style="margin-bottom:14px;">
+            <label for="folio">Folio de Control</label>
+            <input type="text" id="folio" name="folio" readonly placeholder="Cargando folio...">
+        </div>
+
+        <!-- Personal Externo -->
+        <div class="field" style="margin-bottom:14px;">
+            <label for="id_externo">Personal Externo</label>
+            <select id="id_externo" name="id_externo" required>
+                <option value="" disabled selected>Cargando registros...</option>
+            </select>
+        </div>
+
+        <!-- Monto Entero -->
+        <div class="field" style="margin-bottom:18px;">
+            <label for="monto_prestamo">Monto Solicitado ($)</label>
+            <input type="number" id="monto_prestamo" name="monto_prestamo" min="1" step="1" placeholder="Ej: 3500" required>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="actions">
+            <a href="dashboard.html" class="ghost" style="text-decoration:none;display:inline-flex;align-items:center;">Volver al Menú</a>
+            <button type="submit" class="primary">Guardar Registro</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const selectExterno = document.getElementById("id_externo");
+        const inputFolio = document.getElementById("folio");
+        const form = document.getElementById("formPrestamo");
+
+        // 1. Cargar el Folio Automático al inicializar la pantalla
+        fetch('/api/prestamos-externos/nuevo-folio')
+            .then(res => res.json())
+            .then(data => {
+                if (data.folio) inputFolio.value = data.folio;
+            })
+            .catch(err => console.error("Error cargando folio:", err));
+
+        // 2. Cargar Personal Externo activo desde la base de datos
+        fetch('/api/personal-externo')
+            .then(res => res.json())
+            .then(registros => {
+                selectExterno.innerHTML = '<option value="" disabled selected>Selecciona un registro...</option>';
+                registros.forEach(ext => {
+                    const option = document.createElement("option");
+                    option.value = ext.ID_EXTERNO;
+                    option.textContent = ext.NAME;
+                    selectExterno.appendChild(option);
+                });
+            })
+            .catch(err => {
+                console.error("Error cargando personal externo:", err);
+                selectExterno.innerHTML = '<option value="" disabled>Error al cargar la lista</option>';
+            });
+
+        // 3. Enviar el Formulario por AJAX para no recargar la página completa
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+
+            const usuarioActivo = localStorage.getItem("username") || "Sistema";
+
+            const formData = {
+                folio: inputFolio.value,
+                id_externo: selectExterno.value,
+                monto_prestamo: document.getElementById("monto_prestamo").value,
+                username: usuarioActivo
+            };
+
+            fetch('/api/prestamos-externos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) {
+                    const mensaje = res.unificado
+                        ? "Ya tenía saldo pendiente, así que se unificó con el préstamo " + (res.folios_anteriores || []).join(', ') + ".\n" +
+                          "Saldo anterior: $" + Number(res.monto_restante_anterior).toFixed(2) + "\n" +
+                          "Préstamo nuevo: $" + Number(res.monto_nuevo).toFixed(2) + "\n" +
+                          "Nuevo total activo: $" + Number(res.monto_total).toFixed(2)
+                        : "¡Préstamo registrado correctamente!";
+
+                    showAlert(mensaje, "success", 3200).then(() => {
+                        window.location.href = "dashboard.html";
+                    });
+                } else {
+                    showAlert("Error: " + res.error, "error");
+                }
+            })
+            .catch(err => {
+                console.error("Error en el envío:", err);
+                showAlert("Hubo un problema de conexión al guardar el préstamo.", "error");
+            });
+        });
+    });
+</script>
+
+</body>
+</html>

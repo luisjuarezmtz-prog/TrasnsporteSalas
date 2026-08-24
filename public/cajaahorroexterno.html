@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caja de Ahorro - Personal Externo</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+    <div class="brand">
+        <h1>Caja de Ahorro (Personal Externo)</h1>
+        <a href="dashboard.html" class="link-plain tag">← Volver a menú</a>
+    </div>
+
+    <div class="grid grid-3" style="align-items:start;">
+
+        <div class="panel" style="grid-column:span 1;">
+            <h2 id="formTitulo">Asignar Nueva Caja</h2>
+
+            <form id="formCajaAhorro" onsubmit="procesarFormulario(event)">
+                <input type="hidden" id="cajaId" value="">
+
+                <div class="field" style="margin-bottom:12px;">
+                    <label for="selectExterno">Personal Externo</label>
+                    <select id="selectExterno" required>
+                        <option value="">Seleccione un registro...</option>
+                    </select>
+                </div>
+
+                <div class="field" style="margin-bottom:12px;">
+                    <label for="montoAhorro">Cantidad ($)</label>
+                    <input type="number" id="montoAhorro" min="1" step="any" required placeholder="Ej. 500">
+                </div>
+
+                <div class="field" style="margin-bottom:16px;">
+                    <label for="fechaInicio">Fecha de Inicio (Año)</label>
+                    <input type="number" min="1900" max="2100" id="fechaInicio" required>
+                </div>
+
+                <div class="actions">
+                    <button type="button" class="ghost" onclick="window.location.href='dashboard.html'">Regresar</button>
+                    <button type="button" onclick="cancelarEdicion()" id="btnCancelar" class="ghost" style="display:none;">Cancelar</button>
+                    <button type="submit" id="btnGuardar" class="primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="panel" style="grid-column:span 2;">
+            <h2>Personal Externo con Caja de Ahorro Activa</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Personal Externo</th>
+                        <th>Monto</th>
+                        <th>Periodo</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaCajasAhorro"></tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+
+        // Escapar texto antes de insertarlo como HTML (evita XSS almacenado)
+        function escapeHtml(str) {
+            return String(str ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
+        document.getElementById('fechaInicio').value = new Date().getFullYear();
+        let listaExternos = [];
+        let listaCajasAsignadas = [];
+
+        async function obtenerCatalogos() {
+            try {
+                const resExt = await fetch('/api/personal-externo');
+                if (resExt.ok) {
+                    listaExternos = await resExt.json();
+                    llenarSelectorExterno();
+                }
+
+                obtenerCajasAhorro();
+            } catch (e) {
+                console.error("Error catálogos:", e);
+            }
+        }
+
+        function llenarSelectorExterno() {
+            const select = document.getElementById('selectExterno');
+            listaExternos.forEach(ext => {
+                const option = document.createElement('option');
+                option.value = ext.ID_EXTERNO;
+                option.textContent = `${ext.NAME}`;
+                select.appendChild(option);
+            });
+        }
+
+        async function obtenerCajasAhorro() {
+            try {
+                const res = await fetch('/api/caja-ahorro-externo');
+                if (res.ok) {
+                    listaCajasAsignadas = await res.json();
+                    renderizarTabla();
+                }
+            } catch (e) {
+                console.error("Error al obtener cajas de ahorro:", e);
+            }
+        }
+
+        function renderizarTabla() {
+            const tbody = document.getElementById('tablaCajasAhorro');
+            tbody.innerHTML = '';
+
+            if (listaCajasAsignadas.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="hint" style="text-align:center;">No hay registros con caja de ahorro asignada.</td></tr>`;
+                return;
+            }
+
+            listaCajasAsignadas.forEach(caja => {
+                const nombreExt = escapeHtml(caja.EXTERNO);
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${nombreExt}</td>
+                        <td>$${escapeHtml(caja.monto)}</td>
+                        <td>${escapeHtml(caja.fecha)}</td>
+                        <td class="text-center">
+                            <button onclick="prepararEdicion(${caja.id})" class="ghost" title="Editar">✏️</button>
+                            <button onclick="eliminarCajaAhorro(${caja.id})" class="ghost" title="Eliminar">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function prepararEdicion(id) {
+            const caja = listaCajasAsignadas.find(c => c.id == id);
+            if (!caja) return;
+
+            document.getElementById('formTitulo').textContent = "Modificar Caja de Ahorro";
+            document.getElementById('btnGuardar').textContent = "Actualizar Cambios";
+            document.getElementById('btnCancelar').style.display = 'inline-block';
+
+            document.getElementById('cajaId').value = caja.id;
+            document.getElementById('selectExterno').value = caja.ID_EXTERNO;
+            document.getElementById('montoAhorro').value = caja.monto;
+            document.getElementById('fechaInicio').value = caja.fecha;
+
+            document.getElementById('selectExterno').focus();
+        }
+
+        function cancelarEdicion() {
+            document.getElementById('formTitulo').textContent = "Asignar Nueva Caja";
+            document.getElementById('btnGuardar').textContent = "Guardar";
+            document.getElementById('btnCancelar').style.display = 'none';
+            document.getElementById('formCajaAhorro').reset();
+            document.getElementById('cajaId').value = "";
+            document.getElementById('fechaInicio').value = new Date().getFullYear();
+        }
+
+        async function procesarFormulario(event) {
+            event.preventDefault();
+
+            const id = document.getElementById('cajaId').value;
+            const esEdicion = id !== "";
+
+            const data = {
+                externoId: document.getElementById('selectExterno').value,
+                monto: document.getElementById('montoAhorro').value,
+                fecha: document.getElementById('fechaInicio').value
+            };
+
+            const url = esEdicion ? `/api/caja-ahorro-externo/${id}` : '/api/caja-ahorro-externo';
+            const metodo = esEdicion ? 'PUT' : 'POST';
+
+            try {
+                const response = await fetch(url, {
+                    method: metodo,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    showAlert(esEdicion ? '¡Registro actualizado con éxito!' : '¡Caja de ahorro registrada con éxito!', 'success');
+                    cancelarEdicion();
+                    await obtenerCajasAhorro();
+                } else {
+                    showAlert('Hubo un error al procesar la solicitud.', 'error');
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                showAlert('Error de comunicación con el servidor.', 'error');
+            }
+        }
+
+        async function eliminarCajaAhorro(id) {
+            const ok = await showConfirm('¿Estás seguro de que deseas eliminar esta caja de ahorro?', {
+                type: 'danger', title: 'Eliminar caja de ahorro', confirmText: 'Eliminar'
+            });
+            if (!ok) return;
+
+            try {
+                const response = await fetch(`/api/caja-ahorro-externo/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showAlert('Registro eliminado correctamente.', 'success');
+                    cancelarEdicion();
+                    await obtenerCajasAhorro();
+                } else {
+                    showAlert('No se pudo eliminar el registro.', 'error');
+                }
+            } catch (error) {
+                console.error("Error al eliminar:", error);
+                showAlert('Error de conexión.', 'error');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            obtenerCatalogos();
+        })
+
+    </script>
+</body>
+</html>
