@@ -101,7 +101,9 @@
             </div>
 
             <div class="modal-body">
-                <p class="hint" style="margin:0 0 10px;">Saldo restante actual: <b id="abono-saldo-restante">$0.00</b></p>
+                <p class="hint" style="margin:0 0 4px;">Saldo restante actual: <b id="abono-saldo-restante">$0.00</b></p>
+                <p class="hint" style="margin:0 0 4px;">Interés (3%): <b id="abono-interes" style="color:var(--amber);">$0.00</b></p>
+                <p class="hint" style="margin:0 0 10px;">Saldo con interés: <b id="abono-saldo-con-interes">$0.00</b></p>
                 <div class="field">
                     <label for="abono-monto">Monto a Abonar ($)</label>
                     <input type="number" id="abono-monto" min="1" step="1" placeholder="Ej. 500">
@@ -269,7 +271,9 @@
                         ? `<span class="badge badge-info">Préstamo otorgado</span>`
                         : `<span class="badge badge-ok">Abono</span>`;
 
-                    const montoTexto = (esPrestamo ? '+ ' : '- ') + formatMoney(parseFloat(ev.MONTO) || 0);
+                    const interesAplicado = parseFloat(ev.INTERES) || 0;
+                    const montoTexto = (esPrestamo ? '+ ' : '- ') + formatMoney(parseFloat(ev.MONTO) || 0) +
+                        (!esPrestamo && interesAplicado > 0 ? `<span class="hint" style="display:block;">(+ ${formatMoney(interesAplicado)} interés)</span>` : '');
                     const montoClase = esPrestamo ? 'color:var(--amber);' : 'color:var(--ok);';
                     const restanteTexto = ev.MONTO_RESTANTE === null || ev.MONTO_RESTANTE === undefined
                         ? '—'
@@ -306,10 +310,19 @@
         }
 
         // ───────────────────────── REGISTRAR ABONO MANUAL ─────────────────────────
+        // El interés (3%) se suma al saldo antes de aplicar el abono — mismo
+        // criterio que aplica el backend en POST /prestamos-externos/:id/abono.
+        // Este cálculo es solo una vista previa; el servidor es quien decide
+        // el monto real con el que se guarda.
+        const TASA_INTERES_EXTERNO = 0.03;
+
         function abrirModalAbono(idPrestamo, externo, saldoRestante) {
             idPrestamoParaAbono = idPrestamo;
+            const interes = Math.round(saldoRestante * TASA_INTERES_EXTERNO);
             document.getElementById('abono-externo').innerText = externo;
             document.getElementById('abono-saldo-restante').innerText = formatMoney(saldoRestante);
+            document.getElementById('abono-interes').innerText = formatMoney(interes);
+            document.getElementById('abono-saldo-con-interes').innerText = formatMoney(saldoRestante + interes);
             document.getElementById('abono-monto').value = '';
             document.getElementById('modal-registrar-abono').classList.remove('hidden');
         }

@@ -40,8 +40,8 @@ router.post('/prestamos-externos', async (req, res) => {
   try {
     const [activos] = await dbPromesa.query(
       `SELECT R.ID_PRESTAMO, R.FOLIO, R.MONTO_PRESTAMO,
-              (R.MONTO_PRESTAMO - COALESCE(
-                (SELECT SUM(AB.MONTO_ABONO) FROM abono_prestamos_externos AB WHERE AB.ID_PRESTAMO = R.ID_PRESTAMO), 0
+              (R.MONTO_PRESTAMO + COALESCE(
+                (SELECT SUM(AB.INTERES) - SUM(AB.MONTO_ABONO) FROM abono_prestamos_externos AB WHERE AB.ID_PRESTAMO = R.ID_PRESTAMO), 0
               )) AS RESTANTE
          FROM reg_prestamos_externos R
         WHERE R.ID_EXTERNO = ? AND R.ESTATUS = 1`,
@@ -98,13 +98,14 @@ SELECT
     CONCAT(P.FIRST_NAME, ' ', P.PARENTAL_LAST) AS EXTERNO,
     R.MONTO_PRESTAMO AS MONTO_PRESTAMO,
     COALESCE(G.MONTO_ABONADO, 0) AS MONTO_ABONADO,
-    (R.MONTO_PRESTAMO - COALESCE(G.MONTO_ABONADO, 0)) AS MONTO_RESTANTE
+    (R.MONTO_PRESTAMO + COALESCE(G.INTERES_ACUMULADO, 0) - COALESCE(G.MONTO_ABONADO, 0)) AS MONTO_RESTANTE
 FROM reg_prestamos_externos R
 LEFT JOIN personal_externo P ON P.ID_EXTERNO = R.ID_EXTERNO
 LEFT JOIN (
     SELECT
         AB.ID_PRESTAMO,
-        SUM(AB.MONTO_ABONO) AS MONTO_ABONADO
+        SUM(AB.MONTO_ABONO) AS MONTO_ABONADO,
+        SUM(AB.INTERES) AS INTERES_ACUMULADO
     FROM abono_prestamos_externos AB
     GROUP BY AB.ID_PRESTAMO
 ) G ON G.ID_PRESTAMO = R.ID_PRESTAMO
@@ -121,6 +122,12 @@ ORDER BY R.ID_PRESTAMO DESC;`;
 });
 
 // --- REGISTRAR UN ABONO MANUAL (Personal Externo no tiene nómina) ---
+// A diferencia de empleados (donde el interés es solo un renglón
+// informativo en la nómina, revisarnomina.html), aquí el interés SÍ se
+// suma al saldo del préstamo: cada abono primero le agrega el 3% de
+// interés al saldo pendiente y luego resta el monto abonado.
+const TASA_INTERES_EXTERNO = 0.03;
+
 router.post('/prestamos-externos/:id/abono', async (req, res) => {
   const { id } = req.params;
   const monto = parseFloat(req.body.monto);
@@ -147,22 +154,26 @@ router.post('/prestamos-externos/:id/abono', async (req, res) => {
     }
 
     const restanteActual = parseFloat(prestamo.RESTANTE) || 0;
-    if (monto > restanteActual) {
-      return res.status(400).json({ success: false, message: `El abono no puede ser mayor al saldo restante ($${restanteActual.toFixed(2)}).` });
+    const interes = Math.round(restanteActual * TASA_INTERES_EXTERNO);
+    const restanteConInteres = restanteActual + interes;
+
+    if (monto > restanteConInteres) {
+      return res.status(400).json({ success: false, message: `El abono no puede ser mayor al saldo con interés ($${restanteConInteres.toFixed(2)}).` });
     }
 
-    const montoRestante = restanteActual - monto;
+    const montoRestante = restanteConInteres - monto;
     const folioAbono = `ABONO-${Date.now()}`;
 
     await dbPromesa.query(
-      `INSERT INTO abono_prestamos_externos (ID_PRESTAMO, MONTO_ABONO, MONTO_RESTANTE, USUARIO, FECHA_CREACION, FOLIO)
-       VALUES (?, ?, ?, ?, NOW(), ?)`,
-      [id, monto, montoRestante, username, folioAbono]
+      `INSERT INTO abono_prestamos_externos (ID_PRESTAMO, MONTO_ABONO, INTERES, MONTO_RESTANTE, USUARIO, FECHA_CREACION, FOLIO)
+       VALUES (?, ?, ?, ?, ?, NOW(), ?)`,
+      [id, monto, interes, montoRestante, username, folioAbono]
     );
 
     res.json({
       success: true,
       message: montoRestante === 0 ? 'Abono registrado. El préstamo quedó liquidado.' : 'Abono registrado correctamente.',
+      interes,
       monto_restante: montoRestante
     });
   } catch (err) {
@@ -201,7 +212,7 @@ router.get('/abonos-externos', async (req, res) => {
 
     const [abonosAgrupados] = idsPrestamos.length
       ? await dbPromesa.query(
-          `SELECT ID_PRESTAMO, COALESCE(SUM(MONTO_ABONO), 0) AS ABONADO
+          `SELECT ID_PRESTAMO, COALESCE(SUM(MONTO_ABONO), 0) AS ABONADO, COALESCE(SUM(INTERES), 0) AS INTERES_ACUMULADO
              FROM abono_prestamos_externos
             WHERE ID_PRESTAMO IN (?)
             GROUP BY ID_PRESTAMO`,
@@ -211,6 +222,9 @@ router.get('/abonos-externos', async (req, res) => {
     const abonadoPorPrestamo = new Map(
       abonosAgrupados.map(a => [a.ID_PRESTAMO, parseFloat(a.ABONADO) || 0])
     );
+    const interesPorPrestamo = new Map(
+      abonosAgrupados.map(a => [a.ID_PRESTAMO, parseFloat(a.INTERES_ACUMULADO) || 0])
+    );
 
     const eventosPrestamo = prestamosExterno.map((p, i) => {
       const montoTotal = parseFloat(p.MONTO_PRESTAMO) || 0;
@@ -218,7 +232,8 @@ router.get('/abonos-externos', async (req, res) => {
 
       if (i > 0) {
         const anterior = prestamosExterno[i - 1];
-        const restanteAnterior = (parseFloat(anterior.MONTO_PRESTAMO) || 0) -
+        const restanteAnterior = (parseFloat(anterior.MONTO_PRESTAMO) || 0) +
+          (interesPorPrestamo.get(anterior.ID_PRESTAMO) || 0) -
           (abonadoPorPrestamo.get(anterior.ID_PRESTAMO) || 0);
 
         if (restanteAnterior > 0 && restanteAnterior < montoTotal) {
@@ -240,7 +255,7 @@ router.get('/abonos-externos', async (req, res) => {
 
     const [abonosRaw] = idsPrestamos.length
       ? await dbPromesa.query(
-          `SELECT AB.ID_ABONO AS ID, R.FOLIO, R.ESTATUS, AB.MONTO_ABONO AS MONTO,
+          `SELECT AB.ID_ABONO AS ID, R.FOLIO, R.ESTATUS, AB.MONTO_ABONO AS MONTO, AB.INTERES,
                   AB.MONTO_RESTANTE, AB.USUARIO, AB.FECHA_CREACION
              FROM abono_prestamos_externos AB
              INNER JOIN reg_prestamos_externos R ON R.ID_PRESTAMO = AB.ID_PRESTAMO
