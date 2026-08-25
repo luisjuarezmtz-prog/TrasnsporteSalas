@@ -57,6 +57,7 @@
                         <th>Personal Externo</th>
                         <th>Monto</th>
                         <th>Periodo</th>
+                        <th class="text-right">Total Abonado</th>
                         <th class="text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -64,6 +65,62 @@
             </table>
         </div>
 
+    </div>
+
+    <!-- MODAL: REGISTRAR ABONO -->
+    <div id="modal-registrar-abono" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">💵 Registrar Abono</div>
+                    <p class="hint" style="margin:4px 0 0 0;">Personal Externo: <span id="abono-externo">---</span></p>
+                </div>
+                <button onclick="cerrarModalAbono()" class="btn-close" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="hint" style="margin:0 0 10px;">Total abonado hasta ahora: <b id="abono-total-actual">$0.00</b></p>
+                <div class="field">
+                    <label for="abono-monto">Monto a Abonar ($)</label>
+                    <input type="number" id="abono-monto" min="1" step="1" placeholder="Ej. 500">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button onclick="cerrarModalAbono()" class="ghost">Cancelar</button>
+                <button onclick="confirmarAbono()" class="primary">Guardar Abono</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: HISTORIAL DE ABONOS -->
+    <div id="modal-historial-abonos" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width:600px;">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">🕘 Historial de Abonos</div>
+                    <p class="hint" style="margin:4px 0 0 0;">Personal Externo: <span id="historial-externo">---</span></p>
+                </div>
+                <button onclick="cerrarModalHistorial()" class="btn-close" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body" style="max-height:400px;overflow-y:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th class="text-right">Monto</th>
+                            <th>Usuario</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-historial-body"></tbody>
+                </table>
+            </div>
+
+            <div class="modal-footer">
+                <button onclick="cerrarModalHistorial()" class="ghost">Cerrar Ventana</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -75,9 +132,14 @@
             }[ch]));
         }
 
+        const formatMoney = (amount) => {
+            return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount || 0);
+        };
+
         document.getElementById('fechaInicio').value = new Date().getFullYear();
         let listaExternos = [];
         let listaCajasAsignadas = [];
+        let idCajaParaAbono = null;
 
         async function obtenerCatalogos() {
             try {
@@ -120,19 +182,23 @@
             tbody.innerHTML = '';
 
             if (listaCajasAsignadas.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="hint" style="text-align:center;">No hay registros con caja de ahorro asignada.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="hint" style="text-align:center;">No hay registros con caja de ahorro asignada.</td></tr>`;
                 return;
             }
 
             listaCajasAsignadas.forEach(caja => {
                 const nombreExt = escapeHtml(caja.EXTERNO);
+                const nombreEscapadoJs = nombreExt.replace(/'/g, "\\'");
 
                 tbody.innerHTML += `
                     <tr>
                         <td>${nombreExt}</td>
                         <td>$${escapeHtml(caja.monto)}</td>
                         <td>${escapeHtml(caja.fecha)}</td>
+                        <td class="text-right" style="color:var(--ok);">${formatMoney(caja.total_abonado)}</td>
                         <td class="text-center">
+                            <button onclick="abrirModalAbono(${caja.id}, '${nombreEscapadoJs}', ${caja.total_abonado || 0})" class="ghost" title="Registrar abono">💵</button>
+                            <button onclick="abrirModalHistorial(${caja.id}, '${nombreEscapadoJs}')" class="ghost" title="Ver historial">👁️</button>
                             <button onclick="prepararEdicion(${caja.id})" class="ghost" title="Editar">✏️</button>
                             <button onclick="eliminarCajaAhorro(${caja.id})" class="ghost" title="Eliminar">🗑️</button>
                         </td>
@@ -223,6 +289,89 @@
                 console.error("Error al eliminar:", error);
                 showAlert('Error de conexión.', 'error');
             }
+        }
+
+        // ───────────────────────── REGISTRAR ABONO ─────────────────────────
+        function abrirModalAbono(idCaja, externo, totalActual) {
+            idCajaParaAbono = idCaja;
+            document.getElementById('abono-externo').innerText = externo;
+            document.getElementById('abono-total-actual').innerText = formatMoney(totalActual);
+            document.getElementById('abono-monto').value = '';
+            document.getElementById('modal-registrar-abono').classList.remove('hidden');
+        }
+
+        function cerrarModalAbono() {
+            document.getElementById('modal-registrar-abono').classList.add('hidden');
+            idCajaParaAbono = null;
+        }
+
+        async function confirmarAbono() {
+            const monto = document.getElementById('abono-monto').value;
+            if (!monto || parseFloat(monto) <= 0) {
+                return showAlert('Ingresa un monto válido.', 'info');
+            }
+
+            const usuarioActivo = localStorage.getItem('username') || 'Sistema';
+
+            try {
+                const response = await fetch(`/api/caja-ahorro-externo/${idCajaParaAbono}/abono`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ monto, username: usuarioActivo })
+                });
+
+                if (response.ok) {
+                    showAlert('Abono registrado correctamente.', 'success');
+                    cerrarModalAbono();
+                    await obtenerCajasAhorro();
+                } else {
+                    showAlert('No se pudo registrar el abono.', 'error');
+                }
+            } catch (error) {
+                console.error('Error al registrar abono:', error);
+                showAlert('Error de conexión al servidor.', 'error');
+            }
+        }
+
+        // ───────────────────────── HISTORIAL DE ABONOS ─────────────────────────
+        async function abrirModalHistorial(idCaja, externo) {
+            const modal = document.getElementById('modal-historial-abonos');
+            const tbody = document.getElementById('tabla-historial-body');
+            document.getElementById('historial-externo').innerText = externo;
+
+            tbody.innerHTML = `<tr><td colspan="3" class="text-center hint">Cargando historial...</td></tr>`;
+            modal.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`/api/caja-ahorro-externo/${idCaja}/abonos`);
+                if (!response.ok) throw new Error('Fallo al consultar el historial.');
+
+                const abonos = await response.json();
+                tbody.innerHTML = '';
+
+                if (!abonos || abonos.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="text-center hint">Todavía no hay abonos registrados.</td></tr>`;
+                    return;
+                }
+
+                abonos.forEach(ab => {
+                    const fechaLegible = ab.FECHA_CREACION ? new Date(ab.FECHA_CREACION).toLocaleString('es-MX') : 'N/A';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${escapeHtml(fechaLegible)}</td>
+                            <td class="text-right" style="color:var(--ok);font-weight:700;">${formatMoney(ab.MONTO_ABONO)}</td>
+                            <td><span class="badge badge-muted">${escapeHtml(ab.USUARIO || 'Sistema')}</span></td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error('Error cargando historial:', error);
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center" style="color:var(--bad);">No se pudo cargar el historial.</td></tr>`;
+            }
+        }
+
+        function cerrarModalHistorial() {
+            document.getElementById('modal-historial-abonos').classList.add('hidden');
         }
 
         window.addEventListener('DOMContentLoaded', () => {
