@@ -128,21 +128,21 @@
                 <div class="grid grid-2" style="gap:24px;">
                     <div>
                         <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Viajes por Estatus</p>
-                        <canvas id="chartViajesEstatus" height="220"></canvas>
+                        <div style="position:relative;height:260px;"><canvas id="chartViajesEstatus"></canvas></div>
                     </div>
                     <div>
                         <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Local vs Foráneo</p>
-                        <canvas id="chartViajesTipo" height="220"></canvas>
+                        <div style="position:relative;height:260px;"><canvas id="chartViajesTipo"></canvas></div>
                     </div>
                 </div>
                 <div class="grid grid-2" style="gap:24px;margin-top:24px;">
                     <div>
                         <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Ingresos vs Gastos por Día</p>
-                        <canvas id="chartViajesTendencia" height="220"></canvas>
+                        <div style="position:relative;height:260px;"><canvas id="chartViajesTendencia"></canvas></div>
                     </div>
                     <div>
                         <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Top 5 CEDIS (No. de Viajes)</p>
-                        <canvas id="chartViajesCedis" height="220"></canvas>
+                        <div style="position:relative;height:260px;"><canvas id="chartViajesCedis"></canvas></div>
                     </div>
                 </div>
             </div>
@@ -157,15 +157,15 @@
                 <div class="grid grid-3" style="gap:24px;">
                     <div>
                         <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Por Tipo (Ida/Vuelta)</p>
-                        <canvas id="chartMovTipo" height="220"></canvas>
+                        <div style="position:relative;height:240px;"><canvas id="chartMovTipo"></canvas></div>
                     </div>
                     <div>
                         <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Monto por Día</p>
-                        <canvas id="chartMovTendencia" height="220"></canvas>
+                        <div style="position:relative;height:240px;"><canvas id="chartMovTendencia"></canvas></div>
                     </div>
                     <div>
                         <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Top 5 Operadores (Monto)</p>
-                        <canvas id="chartMovOperadores" height="220"></canvas>
+                        <div style="position:relative;height:240px;"><canvas id="chartMovOperadores"></canvas></div>
                     </div>
                 </div>
             </div>
@@ -320,13 +320,20 @@
             if (instanciasGraficas[idCanvas]) instanciasGraficas[idCanvas].destroy();
             const ctx = document.getElementById(idCanvas);
             if (!ctx) return;
+            // El canvas vive dentro de un contenedor con altura fija (ver el
+            // <div style="height:...">); sin maintainAspectRatio:false, Chart.js
+            // calcula su propio alto según un aspect-ratio interno y se puede
+            // desbordar muchísimo en columnas anchas.
+            config.options = { responsive: true, maintainAspectRatio: false, ...config.options };
             instanciasGraficas[idCanvas] = new Chart(ctx, config);
         }
 
         function opcionesEjes() {
+            // precision:0 evita ticks decimales — todos los valores que graficamos
+            // aquí son pesos enteros (columnas INT) o conteos, nunca fracciones.
             return {
-                x: { ticks: { color: cssVar('--ink-dim') }, grid: { color: cssVar('--line') } },
-                y: { ticks: { color: cssVar('--ink-dim') }, grid: { color: cssVar('--line') }, beginAtZero: true }
+                x: { ticks: { color: cssVar('--ink-dim'), precision: 0 }, grid: { color: cssVar('--line') } },
+                y: { ticks: { color: cssVar('--ink-dim'), precision: 0 }, grid: { color: cssVar('--line') }, beginAtZero: true }
             };
         }
 
