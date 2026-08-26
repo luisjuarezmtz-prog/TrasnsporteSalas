@@ -9,7 +9,14 @@ const path = require('path');
 const { db, dbPromesa } = require('../config/db');
 
 // ── Subida de archivos (Tarjeta de Circulación) ──────────────────────────────
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+// En Hostinger (Node.js App Manager) cada "Redesplegar" crea una carpeta de
+// build nueva (hbuilds/versions/<id>), así que cualquier archivo guardado en
+// una ruta relativa al proyecto se pierde en el siguiente deploy. Por eso en
+// producción UPLOADS_DIR debe apuntar, vía variable de entorno, a una ruta
+// absoluta FUERA de esa carpeta de build (ej. dentro de public_html, que sí
+// persiste entre despliegues). En desarrollo local (sin la variable definida)
+// se sigue usando la carpeta relativa de siempre.
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
