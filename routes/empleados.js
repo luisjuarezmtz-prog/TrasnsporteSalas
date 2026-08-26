@@ -242,7 +242,7 @@ router.put('/empleados/:id', (req, res) => {
 });
 
 // --- BAJA / REACTIVACIÓN DE EMPLEADO (STATUS 1 = activo, 0 = baja) ---
-router.put('/empleados/:id/estatus', (req, res) => {
+router.put('/empleados/:id/estatus', async (req, res) => {
   const { id } = req.params;
   const status = parseInt(req.body.status, 10);
 
@@ -250,16 +250,31 @@ router.put('/empleados/:id/estatus', (req, res) => {
     return res.status(400).json({ success: false, message: 'Estatus no válido.' });
   }
 
-  db.query('UPDATE employees SET STATUS = ? WHERE ID_EMPLOYEE = ?', [status, id], (err) => {
-    if (err) {
-      console.error('Error al cambiar estatus del empleado:', err);
-      return res.status(500).json({ success: false, message: 'Error al actualizar el estatus.' });
+  try {
+    // No se permite dar de baja a un empleado con un préstamo activo
+    // (con o sin saldo pendiente) — primero hay que liquidarlo o cerrarlo.
+    if (status === 0) {
+      const [prestamosActivos] = await dbPromesa.query(
+        'SELECT ID_PRESTAMO FROM reg_prestamos WHERE ID_EMPLEADO = ? AND ESTATUS = 1',
+        [id]
+      );
+      if (prestamosActivos.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No se puede dar de baja: tiene un préstamo activo. Liquídalo antes de continuar.'
+        });
+      }
     }
+
+    await dbPromesa.query('UPDATE employees SET STATUS = ? WHERE ID_EMPLOYEE = ?', [status, id]);
     res.json({
       success: true,
       message: status === 1 ? 'Empleado reactivado correctamente.' : 'Empleado dado de baja correctamente.'
     });
-  });
+  } catch (err) {
+    console.error('Error al cambiar estatus del empleado:', err);
+    res.status(500).json({ success: false, message: 'Error al actualizar el estatus.' });
+  }
 });
 
 // --- CUENTAS BANCARIAS (PRINCIPAL Y PROVISIONAL) ---
