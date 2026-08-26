@@ -145,6 +145,12 @@
                         <div style="position:relative;height:260px;"><canvas id="chartViajesCedis"></canvas></div>
                     </div>
                 </div>
+                <div class="grid grid-2" style="gap:24px;margin-top:24px;">
+                    <div>
+                        <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Top 5 Empleados (No. de Viajes)</p>
+                        <div style="position:relative;height:260px;"><canvas id="chartViajesEmpleados"></canvas></div>
+                    </div>
+                </div>
             </div>
 
             <div class="panel">
@@ -328,13 +334,15 @@
             instanciasGraficas[idCanvas] = new Chart(ctx, config);
         }
 
-        function opcionesEjes() {
-            // precision:0 evita ticks decimales — todos los valores que graficamos
-            // aquí son pesos enteros (columnas INT) o conteos, nunca fracciones.
-            return {
-                x: { ticks: { color: cssVar('--ink-dim'), precision: 0 }, grid: { color: cssVar('--line') } },
-                y: { ticks: { color: cssVar('--ink-dim'), precision: 0 }, grid: { color: cssVar('--line') }, beginAtZero: true }
-            };
+        // precision:0 evita ticks decimales (todo lo que graficamos aquí son
+        // pesos enteros o conteos). beginAtZero solo debe ir en el eje de
+        // VALORES, no en el de categorías — en una barra horizontal
+        // (indexAxis:'y') ese eje de valores es "x", no "y"; ponerlo en el eje
+        // equivocado (o en ambos) rompe el cálculo de rango de la escala.
+        function opcionesEjes(horizontal) {
+            const ejeValores = { ticks: { color: cssVar('--ink-dim'), precision: 0 }, grid: { color: cssVar('--line') }, beginAtZero: true };
+            const ejeCategorias = { ticks: { color: cssVar('--ink-dim') }, grid: { color: cssVar('--line') } };
+            return horizontal ? { x: ejeValores, y: ejeCategorias } : { x: ejeCategorias, y: ejeValores };
         }
 
         function opcionesLeyenda(mostrar) {
@@ -387,9 +395,18 @@
                 type: 'bar',
                 data: {
                     labels: datos.porCedi.map(r => r.cedi),
-                    datasets: [{ label: 'Viajes', data: datos.porCedi.map(r => r.total), backgroundColor: azul }]
+                    datasets: [{ label: 'Viajes', data: datos.porCedi.map(r => r.total), backgroundColor: azul, maxBarThickness: 28 }]
                 },
-                options: { indexAxis: 'y', scales: opcionesEjes(), plugins: opcionesLeyenda(false) }
+                options: { indexAxis: 'y', scales: opcionesEjes(true), plugins: opcionesLeyenda(false) }
+            });
+
+            dibujarGrafica('chartViajesEmpleados', {
+                type: 'bar',
+                data: {
+                    labels: datos.porEmpleado.map(r => r.empleado),
+                    datasets: [{ label: 'Viajes', data: datos.porEmpleado.map(r => r.total), backgroundColor: azul, maxBarThickness: 28 }]
+                },
+                options: { indexAxis: 'y', scales: opcionesEjes(true), plugins: opcionesLeyenda(false) }
             });
         }
 
@@ -428,9 +445,9 @@
                 type: 'bar',
                 data: {
                     labels: datos.porOperador.map(r => r.operador),
-                    datasets: [{ label: 'Monto', data: datos.porOperador.map(r => r.monto), backgroundColor: azul }]
+                    datasets: [{ label: 'Monto', data: datos.porOperador.map(r => r.monto), backgroundColor: azul, maxBarThickness: 28 }]
                 },
-                options: { indexAxis: 'y', scales: opcionesEjes(), plugins: opcionesLeyenda(false) }
+                options: { indexAxis: 'y', scales: opcionesEjes(true), plugins: opcionesLeyenda(false) }
             });
         }
 

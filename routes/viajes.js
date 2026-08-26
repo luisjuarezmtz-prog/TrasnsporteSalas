@@ -281,7 +281,8 @@ router.get('/dashboard-resumen', async (req, res) => {
       [porEstatus],
       [porTipo],
       [porDia],
-      [porCedi]
+      [porCedi],
+      [porEmpleado]
     ] = await Promise.all([
       dbPromesa.query(
         `SELECT
@@ -331,6 +332,26 @@ router.get('/dashboard-resumen', async (req, res) => {
          ORDER BY total DESC
          LIMIT 5`,
         rango
+      ),
+      // Empleado asignado = el más reciente en purchases_orders_historys
+      // para esa orden (mismo criterio que la subconsulta EMPLEADO de
+      // GET /consultar-viajes). Los viajes sin empleado asignado todavía
+      // (ID_EMPLOYEE NULL, p.ej. recién capturados) quedan fuera por el
+      // INNER JOIN, ya que no hay a quién atribuírselos.
+      dbPromesa.query(
+        `SELECT emp.FIRST_NAME AS empleado, COUNT(*) AS total
+         FROM purchases_orders p
+         INNER JOIN purchases_orders_historys h ON h.ID_PURCHASE_ORDER = p.ID_PURCHASE_ORDER
+           AND h.ID_PURCHASE_ORDER_HISTORY = (
+             SELECT MAX(h2.ID_PURCHASE_ORDER_HISTORY) FROM purchases_orders_historys h2
+             WHERE h2.ID_PURCHASE_ORDER = p.ID_PURCHASE_ORDER
+           )
+         INNER JOIN employees emp ON h.ID_EMPLOYEE = emp.ID_EMPLOYEE
+         WHERE p.DELIVERY_DATE BETWEEN ? AND ?
+         GROUP BY emp.ID_EMPLOYEE, emp.FIRST_NAME
+         ORDER BY total DESC
+         LIMIT 5`,
+        rango
       )
     ]);
 
@@ -340,7 +361,8 @@ router.get('/dashboard-resumen', async (req, res) => {
       porEstatus,
       porTipo,
       porDia,
-      porCedi
+      porCedi,
+      porEmpleado
     });
   } catch (err) {
     console.error('Error al generar resumen de viajes:', err);
