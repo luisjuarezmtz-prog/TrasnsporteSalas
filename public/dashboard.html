@@ -81,6 +81,14 @@
             </div>
         </div>
 
+        <div id="grupo-reportes">
+            <button class="dropdown-btn">📈 Reportes</button>
+            <div class="dropdown-container">
+                <button class="tab-btn" id="sub-reportesprestamos" onclick="window.location.href='reportesprestamos.html'">🪙 Préstamos</button>
+                <button class="tab-btn" id="sub-reportescajaahorro" onclick="window.location.href='reportescajaahorro.html'">💸 Caja de Ahorro</button>
+            </div>
+        </div>
+
         <div id="grupo-admin">
             <button class="dropdown-btn">⚙️ Administración</button>
             <div class="dropdown-container">
@@ -215,7 +223,7 @@
 
                     // Todos los grupos del sidebar que están sujetos a permisos
                     // (deben coincidir con MODULE_KEY en c_system_modules).
-                    const grupos = ['grupo-viajes', 'grupo-tarimas', 'grupo-empleados', 'grupo-personal-externo', 'grupo-nomina', 'grupo-cxc', 'grupo-cajas', 'grupo-admin'];
+                    const grupos = ['grupo-viajes', 'grupo-tarimas', 'grupo-empleados', 'grupo-personal-externo', 'grupo-nomina', 'grupo-cxc', 'grupo-cajas', 'grupo-reportes', 'grupo-admin'];
 
                     grupos.forEach(idGrupo => {
                         const el = document.getElementById(idGrupo);

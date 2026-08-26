@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Caja de Ahorro - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>📈 Reporte de Caja de Ahorro</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<div class="panel">
+    <div class="actions" style="margin-bottom:18px;">
+        <button class="primary" id="btnTabEmpleados" onclick="cambiarTab('empleados')">🧑‍💼 Empleados</button>
+        <button class="ghost" id="btnTabExternos" onclick="cambiarTab('externos')">👷 Personal Externo</button>
+    </div>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr 2fr auto auto;gap:12px;align-items:end;margin-bottom:18px;">
+        <div class="field">
+            <label>Año desde</label>
+            <input type="number" id="inputAnioInicio" min="1900" max="2100">
+        </div>
+        <div class="field">
+            <label>Año hasta</label>
+            <input type="number" id="inputAnioFin" min="1900" max="2100">
+        </div>
+        <div class="field">
+            <label id="labelPersona">Empleado</label>
+            <select id="selectPersona">
+                <option value="">Todos</option>
+            </select>
+        </div>
+        <button class="primary" onclick="buscarReporte()">🔍 Buscar</button>
+        <button class="ghost" onclick="exportarExcel()">📥 Exportar a Excel</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th id="thPersona">Empleado</th>
+                <th>Año</th>
+                <th class="text-right">Monto Asignado</th>
+                <th class="text-right" id="thAbonado" style="display:none;">Total Abonado</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            <tr><td colspan="4" class="text-center hint">Selecciona un filtro y da clic en Buscar.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    const formatMoney = (v) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v || 0);
+
+    let tabActual = 'empleados';
+
+    const CONFIG_TAB = {
+        empleados: {
+            endpoint: '/api/reportes/caja-ahorro-empleados',
+            catalogo: '/api/empleados',
+            idCampo: 'ID_EMPLOYEE',
+            paramPersona: 'empleado',
+            label: 'Empleado',
+            mostrarAbonado: false,
+        },
+        externos: {
+            endpoint: '/api/reportes/caja-ahorro-externos',
+            catalogo: '/api/personal-externo',
+            idCampo: 'ID_EXTERNO',
+            paramPersona: 'externo',
+            label: 'Personal Externo',
+            mostrarAbonado: true,
+        },
+    };
+
+    function cambiarTab(tab) {
+        tabActual = tab;
+        document.getElementById('btnTabEmpleados').className = tab === 'empleados' ? 'primary' : 'ghost';
+        document.getElementById('btnTabExternos').className = tab === 'externos' ? 'primary' : 'ghost';
+        document.getElementById('labelPersona').textContent = CONFIG_TAB[tab].label;
+        document.getElementById('thPersona').textContent = CONFIG_TAB[tab].label;
+        document.getElementById('thAbonado').style.display = CONFIG_TAB[tab].mostrarAbonado ? '' : 'none';
+        cargarCatalogoPersonas();
+        buscarReporte();
+    }
+
+    function cargarCatalogoPersonas() {
+        const select = document.getElementById('selectPersona');
+        select.innerHTML = '<option value="">Todos</option>';
+        fetch(CONFIG_TAB[tabActual].catalogo)
+            .then(res => res.json())
+            .then(lista => {
+                lista.forEach(p => {
+                    const option = document.createElement('option');
+                    option.value = p[CONFIG_TAB[tabActual].idCampo];
+                    option.textContent = p.NAME;
+                    select.appendChild(option);
+                });
+            })
+            .catch(err => console.error('Error al cargar catálogo:', err));
+    }
+
+    function construirQueryString() {
+        const cfg = CONFIG_TAB[tabActual];
+        const params = new URLSearchParams();
+        const anioInicio = document.getElementById('inputAnioInicio').value;
+        const anioFin = document.getElementById('inputAnioFin').value;
+        const persona = document.getElementById('selectPersona').value;
+        if (anioInicio && anioFin) { params.set('anioInicio', anioInicio); params.set('anioFin', anioFin); }
+        if (persona) params.set(cfg.paramPersona, persona);
+        return params;
+    }
+
+    function buscarReporte() {
+        const cfg = CONFIG_TAB[tabActual];
+        const colspan = cfg.mostrarAbonado ? 4 : 3;
+        const tbody = document.getElementById('tablaCuerpo');
+        tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center hint">Cargando...</td></tr>`;
+
+        fetch(`${cfg.endpoint}?${construirQueryString().toString()}`)
+            .then(res => res.json())
+            .then(res => {
+                if (!res.success || res.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center hint">No se encontraron registros.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = '';
+                res.data.forEach(fila => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${escapeHtml(fila.PERSONA || 'Sin asignar')}</td>
+                        <td>${escapeHtml(fila.ANIO)}</td>
+                        <td class="text-right">${formatMoney(fila.MONTO)}</td>
+                        ${cfg.mostrarAbonado ? `<td class="text-right" style="color:var(--ok);">${formatMoney(fila.TOTAL_ABONADO)}</td>` : ''}
+                    `;
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch(err => {
+                console.error('Error al cargar reporte:', err);
+                tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>`;
+            });
+    }
+
+    function exportarExcel() {
+        const cfg = CONFIG_TAB[tabActual];
+        const params = construirQueryString();
+        params.set('formato', 'excel');
+        window.location.href = `${cfg.endpoint}?${params.toString()}`;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        cambiarTab('empleados');
+    });
+</script>
+
+</body>
+</html>

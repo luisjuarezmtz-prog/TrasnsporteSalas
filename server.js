@@ -37,6 +37,7 @@ app.use('/api', require('./routes/cajaAhorro'));
 app.use('/api', require('./routes/cxc'));
 app.use('/api', require('./routes/proveedores'));
 app.use('/api', require('./routes/catalogosAdmin'));
+app.use('/api', require('./routes/reportes'));
 app.use('/api', require('./routes/checks').router);
 
 // Ruta heredada que el frontend original llama sin el prefijo /api
