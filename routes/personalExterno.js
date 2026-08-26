@@ -203,7 +203,7 @@ router.put('/personal-externo/:id', (req, res) => {
 });
 
 // --- BAJA / REACTIVACIÓN (STATUS 1 = activo, 0 = baja) ---
-router.put('/personal-externo/:id/estatus', (req, res) => {
+router.put('/personal-externo/:id/estatus', async (req, res) => {
   const { id } = req.params;
   const status = parseInt(req.body.status, 10);
 
@@ -211,16 +211,31 @@ router.put('/personal-externo/:id/estatus', (req, res) => {
     return res.status(400).json({ success: false, message: 'Estatus no válido.' });
   }
 
-  db.query('UPDATE personal_externo SET STATUS = ? WHERE ID_EXTERNO = ?', [status, id], (err) => {
-    if (err) {
-      console.error('Error al cambiar estatus de personal externo:', err);
-      return res.status(500).json({ success: false, message: 'Error al actualizar el estatus.' });
+  try {
+    // No se permite dar de baja a alguien con un préstamo activo (con o
+    // sin saldo pendiente) — primero hay que liquidarlo o cerrarlo.
+    if (status === 0) {
+      const [prestamosActivos] = await dbPromesa.query(
+        'SELECT ID_PRESTAMO FROM reg_prestamos_externos WHERE ID_EXTERNO = ? AND ESTATUS = 1',
+        [id]
+      );
+      if (prestamosActivos.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No se puede dar de baja: tiene un préstamo activo. Liquídalo antes de continuar.'
+        });
+      }
     }
+
+    await dbPromesa.query('UPDATE personal_externo SET STATUS = ? WHERE ID_EXTERNO = ?', [status, id]);
     res.json({
       success: true,
       message: status === 1 ? 'Registro reactivado correctamente.' : 'Registro dado de baja correctamente.'
     });
-  });
+  } catch (err) {
+    console.error('Error al cambiar estatus de personal externo:', err);
+    res.status(500).json({ success: false, message: 'Error al actualizar el estatus.' });
+  }
 });
 
 // --- CUENTAS BANCARIAS (PRINCIPAL Y PROVISIONAL) ---
