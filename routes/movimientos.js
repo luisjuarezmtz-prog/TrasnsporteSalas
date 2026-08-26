@@ -3,7 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { db } = require('../config/db');
+const { db, dbPromesa } = require('../config/db');
 
 // --- RUTA 10: REGISTRAR MOVIMIENTO (CON USUARIO LOGEADO) ---
 router.post('/registrar-movimiento', (req, res) => {
@@ -99,6 +99,68 @@ router.get('/buscar-folio-factura', (req, res) => {
       res.json({ success: false, message: 'No se encontró historial para esta factura' });
     }
   });
+});
+
+// --- DASHBOARD — resumen agregado de movimientos para "Resumen General" ---
+router.get('/dashboard-movimientos-resumen', async (req, res) => {
+  const { fechaInicio, fechaFin } = req.query;
+  if (!fechaInicio || !fechaFin) {
+    return res.status(400).json({ success: false, message: 'Faltan fechaInicio/fechaFin.' });
+  }
+  const rango = [fechaInicio, fechaFin];
+
+  try {
+    const [
+      [totalesRows],
+      [porTipo],
+      [porDia],
+      [porOperador]
+    ] = await Promise.all([
+      dbPromesa.query(
+        `SELECT COUNT(*) AS movimientos, COALESCE(SUM(tm.AMOUNT), 0) AS monto
+         FROM travels_movements tm
+         WHERE tm.MOVEMENT_DATE BETWEEN ? AND ?`,
+        rango
+      ),
+      dbPromesa.query(
+        `SELECT ctm.NAME_MOTION AS tipo, COUNT(tm.ID_TRAVEL_MOVEMENT) AS cantidad, COALESCE(SUM(tm.AMOUNT), 0) AS monto
+         FROM travels_movements tm
+         INNER JOIN c_type_motions ctm ON tm.ID_TYPE_MOTION = ctm.ID_TYPE_MOTION
+         WHERE tm.MOVEMENT_DATE BETWEEN ? AND ?
+         GROUP BY ctm.ID_TYPE_MOTION, ctm.NAME_MOTION`,
+        rango
+      ),
+      dbPromesa.query(
+        `SELECT tm.MOVEMENT_DATE AS fecha, COALESCE(SUM(tm.AMOUNT), 0) AS monto
+         FROM travels_movements tm
+         WHERE tm.MOVEMENT_DATE BETWEEN ? AND ?
+         GROUP BY tm.MOVEMENT_DATE
+         ORDER BY tm.MOVEMENT_DATE ASC`,
+        rango
+      ),
+      dbPromesa.query(
+        `SELECT CONCAT(e.FIRST_NAME, ' ', e.PARENTAL_LAST) AS operador, COALESCE(SUM(tm.AMOUNT), 0) AS monto
+         FROM travels_movements tm
+         INNER JOIN employees e ON tm.ID_EMPLOYEE = e.ID_EMPLOYEE
+         WHERE tm.MOVEMENT_DATE BETWEEN ? AND ?
+         GROUP BY tm.ID_EMPLOYEE, e.FIRST_NAME, e.PARENTAL_LAST
+         ORDER BY monto DESC
+         LIMIT 5`,
+        rango
+      )
+    ]);
+
+    res.json({
+      success: true,
+      totales: totalesRows[0] || { movimientos: 0, monto: 0 },
+      porTipo,
+      porDia,
+      porOperador
+    });
+  } catch (err) {
+    console.error('Error al generar resumen de movimientos:', err);
+    res.status(500).json({ success: false, message: 'Error al generar el resumen.' });
+  }
 });
 
 module.exports = router;

@@ -4,7 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const ExcelJS = require('exceljs');
-const { db } = require('../config/db');
+const { db, dbPromesa } = require('../config/db');
 const { transporter, REMITENTE_DEFAULT } = require('../config/mailer');
 
 // --- RUTA 3: CONSULTAR VIAJES ---
@@ -265,13 +265,87 @@ router.get('/valida-orden-compra', (req, res) => {
   });
 });
 
-// --- RUTA 18: DASHBOARD ---
-router.get('/dashboard-resumen', (req, res) => {
-  const query = `SELECT st.STATUS_NAME, COUNT(p.ID_PURCHASE_ORDER) as total FROM status_orders st LEFT JOIN purchases_orders p ON st.ID_STATUS_ORDER = p.ID_STATUS_ORDER GROUP BY st.STATUS_NAME`;
-  db.query(query, (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(results);
-  });
+// --- RUTA 18: DASHBOARD — resumen agregado de viajes para "Resumen General" ---
+// Ingresos/gastos excluyen viajes CANCELADO, mismo criterio que ya usa
+// consultarviajes.html al sumar sus totales en el cliente.
+router.get('/dashboard-resumen', async (req, res) => {
+  const { fechaInicio, fechaFin } = req.query;
+  if (!fechaInicio || !fechaFin) {
+    return res.status(400).json({ success: false, message: 'Faltan fechaInicio/fechaFin.' });
+  }
+  const rango = [fechaInicio, fechaFin];
+
+  try {
+    const [
+      [totalesRows],
+      [porEstatus],
+      [porTipo],
+      [porDia],
+      [porCedi]
+    ] = await Promise.all([
+      dbPromesa.query(
+        `SELECT
+            COUNT(*) AS viajes,
+            COALESCE(SUM(CASE WHEN COALESCE(st.STATUS_NAME,'') != 'CANCELADO' THEN p.TRAVEL_COST ELSE 0 END), 0) AS ingresos,
+            COALESCE(SUM(CASE WHEN COALESCE(st.STATUS_NAME,'') != 'CANCELADO' THEN p.COST_EXPENSES ELSE 0 END), 0) AS gastos
+         FROM purchases_orders p
+         LEFT JOIN status_orders st ON p.ID_STATUS_ORDER = st.ID_STATUS_ORDER
+         WHERE p.DELIVERY_DATE BETWEEN ? AND ?`,
+        rango
+      ),
+      dbPromesa.query(
+        `SELECT st.STATUS_NAME AS estatus, COUNT(p.ID_PURCHASE_ORDER) AS total
+         FROM purchases_orders p
+         LEFT JOIN status_orders st ON p.ID_STATUS_ORDER = st.ID_STATUS_ORDER
+         WHERE p.DELIVERY_DATE BETWEEN ? AND ?
+         GROUP BY st.ID_STATUS_ORDER, st.STATUS_NAME
+         ORDER BY st.ID_STATUS_ORDER ASC`,
+        rango
+      ),
+      dbPromesa.query(
+        `SELECT COALESCE(tt.TYPE, 'No definido') AS tipo, COUNT(p.ID_PURCHASE_ORDER) AS total
+         FROM purchases_orders p
+         LEFT JOIN c_cedis c ON p.ID_CEDI = c.ID_CEDI
+         LEFT JOIN c_type_of_trip tt ON c.ID_TYPE_TRIP = tt.ID_TYPE_TRIP
+         WHERE p.DELIVERY_DATE BETWEEN ? AND ?
+         GROUP BY tt.ID_TYPE_TRIP, tt.TYPE`,
+        rango
+      ),
+      dbPromesa.query(
+        `SELECT p.DELIVERY_DATE AS fecha,
+            COALESCE(SUM(CASE WHEN COALESCE(st.STATUS_NAME,'') != 'CANCELADO' THEN p.TRAVEL_COST ELSE 0 END), 0) AS ingresos,
+            COALESCE(SUM(CASE WHEN COALESCE(st.STATUS_NAME,'') != 'CANCELADO' THEN p.COST_EXPENSES ELSE 0 END), 0) AS gastos
+         FROM purchases_orders p
+         LEFT JOIN status_orders st ON p.ID_STATUS_ORDER = st.ID_STATUS_ORDER
+         WHERE p.DELIVERY_DATE BETWEEN ? AND ?
+         GROUP BY p.DELIVERY_DATE
+         ORDER BY p.DELIVERY_DATE ASC`,
+        rango
+      ),
+      dbPromesa.query(
+        `SELECT COALESCE(c.CEDI_NAME, 'Sin CEDIS') AS cedi, COUNT(p.ID_PURCHASE_ORDER) AS total
+         FROM purchases_orders p
+         LEFT JOIN c_cedis c ON p.ID_CEDI = c.ID_CEDI
+         WHERE p.DELIVERY_DATE BETWEEN ? AND ?
+         GROUP BY c.ID_CEDI, c.CEDI_NAME
+         ORDER BY total DESC
+         LIMIT 5`,
+        rango
+      )
+    ]);
+
+    res.json({
+      success: true,
+      totales: totalesRows[0] || { viajes: 0, ingresos: 0, gastos: 0 },
+      porEstatus,
+      porTipo,
+      porDia,
+      porCedi
+    });
+  } catch (err) {
+    console.error('Error al generar resumen de viajes:', err);
+    res.status(500).json({ success: false, message: 'Error al generar el resumen.' });
+  }
 });
 
 module.exports = router;

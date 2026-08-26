@@ -98,8 +98,76 @@
 
         <div id="inicio" class="tab-content active">
             <div class="panel">
-                <h2>Resumen General</h2>
-                <p class="hint" style="font-size:13px;">Este es el panel principal de tu aplicación.</p>
+                <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;">
+                    <div>
+                        <h2 style="border:none;padding:0;margin:0 0 4px;">Resumen General</h2>
+                        <p class="hint" style="margin:0;">Datos en vivo de Viajes y Movimientos.</p>
+                    </div>
+                    <div class="grid" style="grid-template-columns:auto auto auto;gap:12px;align-items:end;">
+                        <div class="field" style="margin:0;">
+                            <label>Desde</label>
+                            <input type="date" id="resumenFechaInicio">
+                        </div>
+                        <div class="field" style="margin:0;">
+                            <label>Hasta</label>
+                            <input type="date" id="resumenFechaFin">
+                        </div>
+                        <button class="primary" onclick="cargarResumenGeneral()">🔄 Actualizar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>📊 Resumen de Viajes</h2>
+                <div class="grid grid-4" style="margin-bottom:18px;">
+                    <div class="stat-card"><div class="stat-label">Total Viajes</div><div id="rv-total-viajes" class="stat-value">—</div></div>
+                    <div class="stat-card"><div class="stat-label">Ingresos</div><div id="rv-ingresos" class="stat-value ok">—</div></div>
+                    <div class="stat-card"><div class="stat-label">Gastos</div><div id="rv-gastos" class="stat-value bad">—</div></div>
+                    <div class="stat-card"><div class="stat-label">Utilidad</div><div id="rv-utilidad" class="stat-value amber">—</div></div>
+                </div>
+                <div class="grid grid-2" style="gap:24px;">
+                    <div>
+                        <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Viajes por Estatus</p>
+                        <canvas id="chartViajesEstatus" height="220"></canvas>
+                    </div>
+                    <div>
+                        <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Local vs Foráneo</p>
+                        <canvas id="chartViajesTipo" height="220"></canvas>
+                    </div>
+                </div>
+                <div class="grid grid-2" style="gap:24px;margin-top:24px;">
+                    <div>
+                        <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Ingresos vs Gastos por Día</p>
+                        <canvas id="chartViajesTendencia" height="220"></canvas>
+                    </div>
+                    <div>
+                        <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Top 5 CEDIS (No. de Viajes)</p>
+                        <canvas id="chartViajesCedis" height="220"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>🚚 Resumen de Movimientos</h2>
+                <div class="grid grid-3" style="margin-bottom:18px;">
+                    <div class="stat-card"><div class="stat-label">Total Movimientos</div><div id="rm-total" class="stat-value">—</div></div>
+                    <div class="stat-card"><div class="stat-label">Monto Total</div><div id="rm-monto" class="stat-value ok">—</div></div>
+                    <div class="stat-card"><div class="stat-label">Promedio por Movimiento</div><div id="rm-promedio" class="stat-value amber">—</div></div>
+                </div>
+                <div class="grid grid-3" style="gap:24px;">
+                    <div>
+                        <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Por Tipo (Ida/Vuelta)</p>
+                        <canvas id="chartMovTipo" height="220"></canvas>
+                    </div>
+                    <div>
+                        <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Monto por Día</p>
+                        <canvas id="chartMovTendencia" height="220"></canvas>
+                    </div>
+                    <div>
+                        <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Top 5 Operadores (Monto)</p>
+                        <canvas id="chartMovOperadores" height="220"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -117,6 +185,8 @@
             </div>
         </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 
     <script>
         // --- VALIDACIÓN DE PERMISOS POR ROL ---
@@ -196,6 +266,198 @@
             localStorage.clear();
             window.location.href = 'index.html';
         }
+    </script>
+
+    <script>
+        // ═══════════════════════ RESUMEN GENERAL (gráficas) ═══════════════════════
+        // Paleta categórica validada (contraste + separación CVD) contra los
+        // fondos reales de esta app (--panel oscuro/claro). Orden fijo: cada
+        // serie siempre usa el mismo slot, nunca se reordena por los datos.
+        const PALETA_CATEGORICA = {
+            dark:  ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181'],
+            light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4']
+        };
+        const AZUL_SECUENCIAL = { dark: '#3987e5', light: '#2a78d6' };
+
+        function esTemaClaro() {
+            return document.documentElement.getAttribute('data-theme') === 'light';
+        }
+        function paletaActual() {
+            return esTemaClaro() ? PALETA_CATEGORICA.light : PALETA_CATEGORICA.dark;
+        }
+        function azulActual() {
+            return esTemaClaro() ? AZUL_SECUENCIAL.light : AZUL_SECUENCIAL.dark;
+        }
+        function cssVar(nombre) {
+            return getComputedStyle(document.documentElement).getPropertyValue(nombre).trim();
+        }
+
+        const formatMoney = (v) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v || 0);
+
+        // Las fechas DATE de MySQL llegan como "2026-08-01T06:00:00.000Z"; new Date()
+        // las interpreta en UTC, así que hay que compensar el offset de zona horaria
+        // antes de leer día/mes locales (mismo criterio que consultarviajes.html).
+        function formatearFechaCorta(fechaStr) {
+            const d = new Date(fechaStr);
+            if (isNaN(d.getTime())) return '';
+            d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+            return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        function primerYUltimoDiaDelMes() {
+            const hoy = new Date();
+            const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+            const fin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+            const iso = (d) => d.toISOString().split('T')[0];
+            return { inicio: iso(inicio), fin: iso(fin) };
+        }
+
+        let datosResumenViajes = null;
+        let datosResumenMovimientos = null;
+        const instanciasGraficas = {};
+
+        function dibujarGrafica(idCanvas, config) {
+            if (instanciasGraficas[idCanvas]) instanciasGraficas[idCanvas].destroy();
+            const ctx = document.getElementById(idCanvas);
+            if (!ctx) return;
+            instanciasGraficas[idCanvas] = new Chart(ctx, config);
+        }
+
+        function opcionesEjes() {
+            return {
+                x: { ticks: { color: cssVar('--ink-dim') }, grid: { color: cssVar('--line') } },
+                y: { ticks: { color: cssVar('--ink-dim') }, grid: { color: cssVar('--line') }, beginAtZero: true }
+            };
+        }
+
+        function opcionesLeyenda(mostrar) {
+            return { legend: { display: mostrar, position: 'bottom', labels: { color: cssVar('--ink-dim'), boxWidth: 12, padding: 12 } } };
+        }
+
+        // ───────────────────────── RENDER: VIAJES ─────────────────────────
+        function renderResumenViajes() {
+            const datos = datosResumenViajes;
+            if (!datos) return;
+            const colores = paletaActual();
+            const azul = azulActual();
+
+            document.getElementById('rv-total-viajes').textContent = datos.totales.viajes || 0;
+            document.getElementById('rv-ingresos').textContent = formatMoney(datos.totales.ingresos);
+            document.getElementById('rv-gastos').textContent = formatMoney(datos.totales.gastos);
+            document.getElementById('rv-utilidad').textContent = formatMoney((parseFloat(datos.totales.ingresos) || 0) - (parseFloat(datos.totales.gastos) || 0));
+
+            dibujarGrafica('chartViajesEstatus', {
+                type: 'doughnut',
+                data: {
+                    labels: datos.porEstatus.map(r => r.estatus || 'Sin estatus'),
+                    datasets: [{ data: datos.porEstatus.map(r => r.total), backgroundColor: colores, borderColor: cssVar('--panel'), borderWidth: 2 }]
+                },
+                options: { plugins: opcionesLeyenda(true) }
+            });
+
+            dibujarGrafica('chartViajesTipo', {
+                type: 'doughnut',
+                data: {
+                    labels: datos.porTipo.map(r => r.tipo),
+                    datasets: [{ data: datos.porTipo.map(r => r.total), backgroundColor: colores, borderColor: cssVar('--panel'), borderWidth: 2 }]
+                },
+                options: { plugins: opcionesLeyenda(true) }
+            });
+
+            dibujarGrafica('chartViajesTendencia', {
+                type: 'bar',
+                data: {
+                    labels: datos.porDia.map(r => formatearFechaCorta(r.fecha)),
+                    datasets: [
+                        { label: 'Ingresos', data: datos.porDia.map(r => r.ingresos), backgroundColor: colores[0] },
+                        { label: 'Gastos', data: datos.porDia.map(r => r.gastos), backgroundColor: colores[1] }
+                    ]
+                },
+                options: { scales: opcionesEjes(), plugins: opcionesLeyenda(true) }
+            });
+
+            dibujarGrafica('chartViajesCedis', {
+                type: 'bar',
+                data: {
+                    labels: datos.porCedi.map(r => r.cedi),
+                    datasets: [{ label: 'Viajes', data: datos.porCedi.map(r => r.total), backgroundColor: azul }]
+                },
+                options: { indexAxis: 'y', scales: opcionesEjes(), plugins: opcionesLeyenda(false) }
+            });
+        }
+
+        // ───────────────────────── RENDER: MOVIMIENTOS ─────────────────────────
+        function renderResumenMovimientos() {
+            const datos = datosResumenMovimientos;
+            if (!datos) return;
+            const colores = paletaActual();
+            const azul = azulActual();
+
+            const totalMov = datos.totales.movimientos || 0;
+            const montoMov = parseFloat(datos.totales.monto) || 0;
+            document.getElementById('rm-total').textContent = totalMov;
+            document.getElementById('rm-monto').textContent = formatMoney(montoMov);
+            document.getElementById('rm-promedio').textContent = formatMoney(totalMov > 0 ? montoMov / totalMov : 0);
+
+            dibujarGrafica('chartMovTipo', {
+                type: 'doughnut',
+                data: {
+                    labels: datos.porTipo.map(r => r.tipo),
+                    datasets: [{ data: datos.porTipo.map(r => r.cantidad), backgroundColor: colores, borderColor: cssVar('--panel'), borderWidth: 2 }]
+                },
+                options: { plugins: opcionesLeyenda(true) }
+            });
+
+            dibujarGrafica('chartMovTendencia', {
+                type: 'line',
+                data: {
+                    labels: datos.porDia.map(r => formatearFechaCorta(r.fecha)),
+                    datasets: [{ label: 'Monto', data: datos.porDia.map(r => r.monto), borderColor: azul, backgroundColor: azul, tension: .25, fill: false }]
+                },
+                options: { scales: opcionesEjes(), plugins: opcionesLeyenda(false) }
+            });
+
+            dibujarGrafica('chartMovOperadores', {
+                type: 'bar',
+                data: {
+                    labels: datos.porOperador.map(r => r.operador),
+                    datasets: [{ label: 'Monto', data: datos.porOperador.map(r => r.monto), backgroundColor: azul }]
+                },
+                options: { indexAxis: 'y', scales: opcionesEjes(), plugins: opcionesLeyenda(false) }
+            });
+        }
+
+        async function cargarResumenGeneral() {
+            const fechaInicio = document.getElementById('resumenFechaInicio').value;
+            const fechaFin = document.getElementById('resumenFechaFin').value;
+            if (!fechaInicio || !fechaFin) return;
+
+            try {
+                const [resViajes, resMovimientos] = await Promise.all([
+                    fetch(`/api/dashboard-resumen?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`).then(r => r.json()),
+                    fetch(`/api/dashboard-movimientos-resumen?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`).then(r => r.json())
+                ]);
+
+                if (resViajes.success) { datosResumenViajes = resViajes; renderResumenViajes(); }
+                if (resMovimientos.success) { datosResumenMovimientos = resMovimientos; renderResumenMovimientos(); }
+            } catch (err) {
+                console.error('Error al cargar el resumen general:', err);
+            }
+        }
+
+        // Si cambia el tema claro/oscuro, se vuelven a pintar las gráficas con
+        // los datos ya cargados (sin volver a pedirlos al servidor).
+        new MutationObserver(() => {
+            renderResumenViajes();
+            renderResumenMovimientos();
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const { inicio, fin } = primerYUltimoDiaDelMes();
+            document.getElementById('resumenFechaInicio').value = inicio;
+            document.getElementById('resumenFechaFin').value = fin;
+            cargarResumenGeneral();
+        });
     </script>
 </body>
 </html>
