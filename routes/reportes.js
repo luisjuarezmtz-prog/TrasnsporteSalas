@@ -10,6 +10,7 @@ const express = require('express');
 const router = express.Router();
 const ExcelJS = require('exceljs');
 const { dbPromesa } = require('../config/db');
+const { conInteresAlDia } = require('../utils/interesExterno');
 
 async function responderReporte(res, formato, nombreHoja, encabezados, filas) {
   if (formato !== 'excel') {
@@ -105,6 +106,10 @@ router.get('/reportes/prestamos-empleados', async (req, res) => {
 });
 
 // --- REPORTE: PRÉSTAMOS DE PERSONAL EXTERNO (con su interés) ---
+// El interés se pacta por préstamo (3% o 10%, semanal o mensual) y se
+// devenga con el paso del tiempo, así que al interés ya capitalizado en
+// los abonos se le suma el devengado a la fecha del reporte — el mismo
+// cálculo que usa la pantalla de consulta (utils/interesExterno.js).
 router.get('/reportes/prestamos-externos', async (req, res) => {
   const { fechaInicio, fechaFin, externo, formato } = req.query;
 
@@ -121,21 +126,25 @@ router.get('/reportes/prestamos-externos', async (req, res) => {
   const whereSql = condiciones.length ? `AND ${condiciones.join(' AND ')}` : '';
 
   try {
-    const [filas] = await dbPromesa.query(
+    const [crudas] = await dbPromesa.query(
       `SELECT
           R.ID_PRESTAMO,
           R.FOLIO,
           CONCAT(P.FIRST_NAME, ' ', P.PARENTAL_LAST) AS PERSONA,
           R.MONTO_PRESTAMO,
+          R.PERIODICIDAD,
+          R.TASA_INTERES,
           COALESCE(G.MONTO_ABONADO, 0) AS MONTO_ABONADO,
-          COALESCE(G.INTERES_TOTAL, 0) AS INTERES,
-          (R.MONTO_PRESTAMO + COALESCE(G.INTERES_TOTAL, 0) - COALESCE(G.MONTO_ABONADO, 0)) AS MONTO_RESTANTE,
+          COALESCE(G.INTERES_TOTAL, 0) AS INTERES_CAPITALIZADO,
+          (R.MONTO_PRESTAMO + COALESCE(G.INTERES_TOTAL, 0) - COALESCE(G.MONTO_ABONADO, 0)) AS SALDO_BASE,
+          COALESCE(G.ULTIMO_MOVIMIENTO, R.FECHA_CREACION) AS FECHA_ULTIMO_MOVIMIENTO,
           CASE WHEN R.ESTATUS = 1 THEN 'Activo' ELSE 'Cerrado' END AS ESTATUS,
           DATE_FORMAT(R.FECHA_CREACION, '%Y-%m-%d') AS FECHA
        FROM reg_prestamos_externos R
        LEFT JOIN personal_externo P ON P.ID_EXTERNO = R.ID_EXTERNO
        LEFT JOIN (
-           SELECT ID_PRESTAMO, SUM(MONTO_ABONO) AS MONTO_ABONADO, SUM(INTERES) AS INTERES_TOTAL
+           SELECT ID_PRESTAMO, SUM(MONTO_ABONO) AS MONTO_ABONADO, SUM(INTERES) AS INTERES_TOTAL,
+                  MAX(FECHA_CREACION) AS ULTIMO_MOVIMIENTO
            FROM abono_prestamos_externos GROUP BY ID_PRESTAMO
        ) G ON G.ID_PRESTAMO = R.ID_PRESTAMO
        WHERE 1=1 ${whereSql}
@@ -143,9 +152,24 @@ router.get('/reportes/prestamos-externos', async (req, res) => {
       params
     );
 
+    // Un préstamo cerrado ya no devenga: su saldo quedó congelado.
+    const filas = crudas.map(fila => {
+      const alDia = conInteresAlDia(fila);
+      const conInteres = fila.ESTATUS === 'Activo'
+        ? alDia
+        : { ...alDia, PERIODOS_PENDIENTES: 0, INTERES_PENDIENTE: 0, MONTO_RESTANTE: alDia.SALDO_BASE };
+
+      return {
+        ...conInteres,
+        CONDICIONES: `${conInteres.TASA_INTERES}% ${conInteres.PERIODICIDAD === 'MENSUAL' ? 'mensual' : 'semanal'}`,
+        INTERES: (parseFloat(fila.INTERES_CAPITALIZADO) || 0) + conInteres.INTERES_PENDIENTE,
+      };
+    });
+
     await responderReporte(res, formato, 'Prestamos_Personal_Externo', [
       { key: 'FOLIO', label: 'Folio' },
       { key: 'PERSONA', label: 'Personal Externo' },
+      { key: 'CONDICIONES', label: 'Interés Pactado' },
       { key: 'MONTO_PRESTAMO', label: 'Monto Préstamo' },
       { key: 'MONTO_ABONADO', label: 'Monto Abonado' },
       { key: 'INTERES', label: 'Interés' },

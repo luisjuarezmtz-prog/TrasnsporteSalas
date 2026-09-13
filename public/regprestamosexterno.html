@@ -33,10 +33,29 @@
         </div>
 
         <!-- Monto Entero -->
-        <div class="field" style="margin-bottom:18px;">
+        <div class="field" style="margin-bottom:14px;">
             <label for="monto_prestamo">Monto Solicitado ($)</label>
             <input type="number" id="monto_prestamo" name="monto_prestamo" min="1" step="1" placeholder="Ej: 3500" required>
         </div>
+
+        <!-- Condiciones del interés -->
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;">
+            <div class="field">
+                <label for="periodicidad">Tipo de Préstamo</label>
+                <select id="periodicidad" name="periodicidad" required>
+                    <option value="SEMANAL" selected>Semanal</option>
+                    <option value="MENSUAL">Mensual</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="tasa_interes">Tasa de Interés</label>
+                <select id="tasa_interes" name="tasa_interes" required>
+                    <option value="3" selected>3%</option>
+                    <option value="10">10%</option>
+                </select>
+            </div>
+        </div>
+        <p class="hint" id="resumen-interes" style="margin:0 0 18px;"></p>
 
         <!-- Botones de Acción -->
         <div class="actions">
@@ -77,7 +96,30 @@
                 selectExterno.innerHTML = '<option value="" disabled>Error al cargar la lista</option>';
             });
 
-        // 3. Enviar el Formulario por AJAX para no recargar la página completa
+        // 3. Vista previa de lo que crecerá el saldo por periodo. El cálculo
+        //    real lo hace el servidor al registrar cada abono.
+        const selectPeriodicidad = document.getElementById("periodicidad");
+        const selectTasa = document.getElementById("tasa_interes");
+        const inputMonto = document.getElementById("monto_prestamo");
+        const resumenInteres = document.getElementById("resumen-interes");
+        const formatMoney = (v) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v || 0);
+
+        function actualizarResumenInteres() {
+            const monto = parseFloat(inputMonto.value) || 0;
+            const tasa = parseFloat(selectTasa.value) || 0;
+            const esMensual = selectPeriodicidad.value === 'MENSUAL';
+            const cada = esMensual ? 'mes' : 'semana';
+            const transcurrido = esMensual ? 'mes transcurrido' : 'semana transcurrida';
+
+            resumenInteres.textContent = monto > 0
+                ? `El saldo aumentará ${tasa}% cada ${cada}: ${formatMoney(Math.round(monto * tasa / 100))} sobre el saldo vigente por cada ${transcurrido}.`
+                : `El saldo aumentará ${tasa}% cada ${cada} mientras quede saldo pendiente.`;
+        }
+
+        [selectPeriodicidad, selectTasa, inputMonto].forEach(el => el.addEventListener("input", actualizarResumenInteres));
+        actualizarResumenInteres();
+
+        // 4. Enviar el Formulario por AJAX para no recargar la página completa
         form.addEventListener("submit", (e) => {
             e.preventDefault();
 
@@ -86,7 +128,9 @@
             const formData = {
                 folio: inputFolio.value,
                 id_externo: selectExterno.value,
-                monto_prestamo: document.getElementById("monto_prestamo").value,
+                monto_prestamo: inputMonto.value,
+                periodicidad: selectPeriodicidad.value,
+                tasa_interes: selectTasa.value,
                 username: usuarioActivo
             };
 
@@ -98,12 +142,15 @@
             .then(res => res.json())
             .then(res => {
                 if (res.success) {
+                    const condiciones = "Interés " + res.tasa_interes + "% " +
+                        (res.periodicidad === 'MENSUAL' ? 'mensual' : 'semanal') + ".";
+
                     const mensaje = res.unificado
                         ? "Ya tenía saldo pendiente, así que se unificó con el préstamo " + (res.folios_anteriores || []).join(', ') + ".\n" +
-                          "Saldo anterior: $" + Number(res.monto_restante_anterior).toFixed(2) + "\n" +
+                          "Saldo anterior (con interés al día): $" + Number(res.monto_restante_anterior).toFixed(2) + "\n" +
                           "Préstamo nuevo: $" + Number(res.monto_nuevo).toFixed(2) + "\n" +
-                          "Nuevo total activo: $" + Number(res.monto_total).toFixed(2)
-                        : "¡Préstamo registrado correctamente!";
+                          "Nuevo total activo: $" + Number(res.monto_total).toFixed(2) + "\n" + condiciones
+                        : "¡Préstamo registrado correctamente! " + condiciones;
 
                     showAlert(mensaje, "success", 3200).then(() => {
                         window.location.href = "dashboard.html";

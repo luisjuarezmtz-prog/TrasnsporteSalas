@@ -45,6 +45,7 @@
             <tr>
                 <th>Folio</th>
                 <th id="thPersona">Empleado</th>
+                <th id="thCondiciones" style="display:none;">Interés Pactado</th>
                 <th class="text-right">Monto Préstamo</th>
                 <th class="text-right">Monto Abonado</th>
                 <th class="text-right">Interés</th>
@@ -77,6 +78,9 @@
             idCampo: 'ID_EMPLOYEE',
             paramPersona: 'empleado',
             label: 'Empleado',
+            // El interés de empleados se cobra en nómina, no se pacta por
+            // préstamo: no hay periodicidad ni tasa que mostrar.
+            mostrarCondiciones: false,
         },
         externos: {
             endpoint: '/api/reportes/prestamos-externos',
@@ -84,8 +88,11 @@
             idCampo: 'ID_EXTERNO',
             paramPersona: 'externo',
             label: 'Personal Externo',
+            mostrarCondiciones: true,
         },
     };
+
+    const COLSPAN = () => CONFIG_TAB[tabActual].mostrarCondiciones ? 9 : 8;
 
     function cambiarTab(tab) {
         tabActual = tab;
@@ -93,6 +100,7 @@
         document.getElementById('btnTabExternos').className = tab === 'externos' ? 'primary' : 'ghost';
         document.getElementById('labelPersona').textContent = CONFIG_TAB[tab].label;
         document.getElementById('thPersona').textContent = CONFIG_TAB[tab].label;
+        document.getElementById('thCondiciones').style.display = CONFIG_TAB[tab].mostrarCondiciones ? '' : 'none';
         cargarCatalogoPersonas();
         buscarReporte();
     }
@@ -127,13 +135,13 @@
     function buscarReporte() {
         const cfg = CONFIG_TAB[tabActual];
         const tbody = document.getElementById('tablaCuerpo');
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center hint">Cargando...</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${COLSPAN()}" class="text-center hint">Cargando...</td></tr>`;
 
         fetch(`${cfg.endpoint}?${construirQueryString().toString()}`)
             .then(res => res.json())
             .then(res => {
                 if (!res.success || res.data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" class="text-center hint">No se encontraron registros.</td></tr>';
+                    tbody.innerHTML = `<tr><td colspan="${COLSPAN()}" class="text-center hint">No se encontraron registros.</td></tr>`;
                     return;
                 }
                 tbody.innerHTML = '';
@@ -145,6 +153,7 @@
                     tr.innerHTML = `
                         <td style="font-family:var(--mono);">${escapeHtml(fila.FOLIO || 'N/A')}</td>
                         <td>${escapeHtml(fila.PERSONA || 'Sin asignar')}</td>
+                        ${cfg.mostrarCondiciones ? `<td><span class="badge badge-info">${escapeHtml(fila.CONDICIONES)}</span></td>` : ''}
                         <td class="text-right">${formatMoney(fila.MONTO_PRESTAMO)}</td>
                         <td class="text-right" style="color:var(--ok);">${formatMoney(fila.MONTO_ABONADO)}</td>
                         <td class="text-right" style="color:var(--amber);">${formatMoney(fila.INTERES)}</td>
@@ -157,7 +166,7 @@
             })
             .catch(err => {
                 console.error('Error al cargar reporte:', err);
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="${COLSPAN()}" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>`;
             });
     }
 

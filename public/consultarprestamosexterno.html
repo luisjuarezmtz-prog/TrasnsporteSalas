@@ -39,6 +39,7 @@
                 <tr>
                     <th>Folio</th>
                     <th>Personal Externo</th>
+                    <th>Interés</th>
                     <th class="text-right">Monto Préstamo</th>
                     <th class="text-right">Monto Abonado</th>
                     <th class="text-right">Monto Restante</th>
@@ -48,7 +49,7 @@
             </thead>
             <tbody id="tabla-prestamos">
                 <tr>
-                    <td colspan="7" class="text-center hint">Cargando datos desde la base de datos...</td>
+                    <td colspan="8" class="text-center hint">Cargando datos desde la base de datos...</td>
                 </tr>
             </tbody>
         </table>
@@ -101,9 +102,9 @@
             </div>
 
             <div class="modal-body">
-                <p class="hint" style="margin:0 0 4px;">Saldo restante actual: <b id="abono-saldo-restante">$0.00</b></p>
-                <p class="hint" style="margin:0 0 4px;">Interés (3%): <b id="abono-interes" style="color:var(--amber);">$0.00</b></p>
-                <p class="hint" style="margin:0 0 10px;">Saldo con interés: <b id="abono-saldo-con-interes">$0.00</b></p>
+                <p class="hint" style="margin:0 0 4px;">Saldo sin interés: <b id="abono-saldo-restante">$0.00</b></p>
+                <p class="hint" style="margin:0 0 4px;"><span id="abono-interes-label">Interés devengado</span>: <b id="abono-interes" style="color:var(--amber);">$0.00</b></p>
+                <p class="hint" style="margin:0 0 10px;">Saldo a la fecha: <b id="abono-saldo-con-interes">$0.00</b></p>
                 <div class="field">
                     <label for="abono-monto">Monto a Abonar ($)</label>
                     <input type="number" id="abono-monto" min="1" step="1" placeholder="Ej. 500">
@@ -131,6 +132,18 @@
         };
 
         let idPrestamoParaAbono = null;
+        // Saldos que devuelve el backend, indexados por préstamo: la vista
+        // previa del modal usa el interés YA CALCULADO por el servidor
+        // (periodos completos transcurridos × tasa pactada), no una tasa
+        // fija del lado del cliente.
+        const saldosPorPrestamo = {};
+
+        const etiquetaPeriodo = (periodicidad) => periodicidad === 'MENSUAL' ? 'mensual' : 'semanal';
+        const etiquetaPeriodos = (periodicidad, n) => {
+            const singular = periodicidad === 'MENSUAL' ? 'mes' : 'semana';
+            const plural = periodicidad === 'MENSUAL' ? 'meses' : 'semanas';
+            return `${n} ${n === 1 ? singular : plural}`;
+        };
 
         async function cargarPrestamos() {
             const tbody = document.getElementById('tabla-prestamos');
@@ -148,7 +161,7 @@
                 if (!prestamos || prestamos.length === 0) {
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="7" class="text-center hint">
+                            <td colspan="8" class="text-center hint">
                                 No se encontraron préstamos registrados en la base de datos.
                             </td>
                         </tr>
@@ -161,6 +174,8 @@
                 let totalRestante = 0;
 
                 prestamos.forEach(p => {
+                    saldosPorPrestamo[p.ID_PRESTAMO] = p;
+
                     const mPrestamo = parseFloat(p.MONTO_PRESTAMO) || 0;
                     const mAbonado = parseFloat(p.MONTO_ABONADO) || 0;
                     const mRestante = parseFloat(p.MONTO_RESTANTE) || 0;
@@ -183,13 +198,19 @@
 
                     const nombreExterno = (p.EXTERNO || 'SIN REGISTRO ASIGNADO').replace(/'/g, "\\'");
 
+                    const interesPendiente = parseFloat(p.INTERES_PENDIENTE) || 0;
+                    const detalleInteres = interesPendiente > 0
+                        ? `<span class="hint" style="display:block;color:var(--amber);">+ ${formatMoney(interesPendiente)} (${etiquetaPeriodos(p.PERIODICIDAD, p.PERIODOS_PENDIENTES)})</span>`
+                        : '';
+
                     const fila = `
                         <tr>
                             <td style="font-family:var(--mono);font-weight:700;">${escapeHtml(p.FOLIO || 'N/A')}</td>
                             <td style="text-transform:uppercase;">${escapeHtml(p.EXTERNO || 'SIN REGISTRO ASIGNADO')}</td>
+                            <td><span class="badge badge-info">${escapeHtml(p.TASA_INTERES)}% ${etiquetaPeriodo(p.PERIODICIDAD)}</span></td>
                             <td class="text-right">${formatMoney(mPrestamo)}</td>
                             <td class="text-right" style="color:var(--ok);">${formatMoney(mAbonado)}</td>
-                            <td class="text-right"><span class="badge ${claseRestante}">${formatMoney(mRestante)}</span></td>
+                            <td class="text-right"><span class="badge ${claseRestante}">${formatMoney(mRestante)}</span>${detalleInteres}</td>
                             <td style="width:160px;">
                                 <div style="display:flex;align-items:center;gap:8px;">
                                     <div class="progress-track" style="flex:1;">
@@ -199,7 +220,7 @@
                                 </div>
                             </td>
                             <td class="text-center">
-                                <button title="Registrar abono" onclick="abrirModalAbono('${p.ID_PRESTAMO}', '${nombreExterno}', ${mRestante})" class="ghost">💵</button>
+                                <button title="Registrar abono" onclick="abrirModalAbono('${p.ID_PRESTAMO}', '${nombreExterno}')" class="ghost">💵</button>
                                 <button title="Ver historial" onclick="abrirModalAbonos('${p.ID_PRESTAMO}', '${nombreExterno}')" class="ghost">👁️</button>
                             </td>
                         </tr>
@@ -217,7 +238,7 @@
                 console.error("Detalle del fallo en frontend:", error);
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="text-center" style="color:var(--bad);">
+                        <td colspan="8" class="text-center" style="color:var(--bad);">
                             ⚠️ Error de comunicación: No se pudo cargar la información.<br>
                             <span class="hint">${escapeHtml(error.message)}</span>
                         </td>
@@ -272,8 +293,12 @@
                         : `<span class="badge badge-ok">Abono</span>`;
 
                     const interesAplicado = parseFloat(ev.INTERES) || 0;
+                    const periodosCobrados = parseInt(ev.PERIODOS) || 0;
+                    const detallePeriodos = periodosCobrados > 0
+                        ? ` / ${etiquetaPeriodos(ev.PERIODICIDAD, periodosCobrados)}`
+                        : '';
                     const montoTexto = (esPrestamo ? '+ ' : '- ') + formatMoney(parseFloat(ev.MONTO) || 0) +
-                        (!esPrestamo && interesAplicado > 0 ? `<span class="hint" style="display:block;">(+ ${formatMoney(interesAplicado)} interés)</span>` : '');
+                        (!esPrestamo && interesAplicado > 0 ? `<span class="hint" style="display:block;">(+ ${formatMoney(interesAplicado)} interés${detallePeriodos})</span>` : '');
                     const montoClase = esPrestamo ? 'color:var(--amber);' : 'color:var(--ok);';
                     const restanteTexto = ev.MONTO_RESTANTE === null || ev.MONTO_RESTANTE === undefined
                         ? '—'
@@ -310,19 +335,27 @@
         }
 
         // ───────────────────────── REGISTRAR ABONO MANUAL ─────────────────────────
-        // El interés (3%) se suma al saldo antes de aplicar el abono — mismo
-        // criterio que aplica el backend en POST /prestamos-externos/:id/abono.
-        // Este cálculo es solo una vista previa; el servidor es quien decide
-        // el monto real con el que se guarda.
-        const TASA_INTERES_EXTERNO = 0.03;
+        // El interés devengado (tasa pactada × periodos completos desde el
+        // último movimiento) se suma al saldo antes de aplicar el abono. Los
+        // montos que se muestran aquí son los que ya calculó el backend en
+        // /api/prestamos-externos-consulta; el servidor los vuelve a calcular
+        // al guardar, así que este modal es solo la vista previa.
+        function abrirModalAbono(idPrestamo, externo) {
+            const p = saldosPorPrestamo[idPrestamo];
+            if (!p) return showAlert('No se pudo leer el saldo del préstamo. Recarga la página.', 'error');
 
-        function abrirModalAbono(idPrestamo, externo, saldoRestante) {
             idPrestamoParaAbono = idPrestamo;
-            const interes = Math.round(saldoRestante * TASA_INTERES_EXTERNO);
+            const saldoBase = parseFloat(p.SALDO_BASE) || 0;
+            const interes = parseFloat(p.INTERES_PENDIENTE) || 0;
+            const periodos = parseInt(p.PERIODOS_PENDIENTES) || 0;
+
             document.getElementById('abono-externo').innerText = externo;
-            document.getElementById('abono-saldo-restante').innerText = formatMoney(saldoRestante);
+            document.getElementById('abono-saldo-restante').innerText = formatMoney(saldoBase);
+            document.getElementById('abono-interes-label').innerText = periodos > 0
+                ? `Interés devengado (${p.TASA_INTERES}% × ${etiquetaPeriodos(p.PERIODICIDAD, periodos)})`
+                : `Interés devengado (aún no cumple 1 ${p.PERIODICIDAD === 'MENSUAL' ? 'mes' : 'semana'})`;
             document.getElementById('abono-interes').innerText = formatMoney(interes);
-            document.getElementById('abono-saldo-con-interes').innerText = formatMoney(saldoRestante + interes);
+            document.getElementById('abono-saldo-con-interes').innerText = formatMoney(saldoBase + interes);
             document.getElementById('abono-monto').value = '';
             document.getElementById('modal-registrar-abono').classList.remove('hidden');
         }
