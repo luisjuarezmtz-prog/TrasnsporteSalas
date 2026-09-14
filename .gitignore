@@ -3,3 +3,11 @@ node_modules/
 uploads/
 npm-debug.log
 _backup_original/
+
+# Volcados de la base de producción: contienen datos reales de nómina y
+# empleados, nunca deben llegar al repositorio.
+*.sql.dump
+DB_SALAS*.sql
+
+# Configuración local de herramientas
+.claude.json
