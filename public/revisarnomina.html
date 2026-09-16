@@ -238,16 +238,19 @@ const fFin = item.PERIOD_END ? new Date(item.PERIOD_END).toLocaleDateString() : 
         // notifica a la cuenta admin del sistema (distinta según el
         // ambiente: Gmail en desarrollo, admin@transportesalas.net en
         // producción), así que el mensaje no menciona una dirección fija.
-        const ok = await showConfirm(`¿Enviar comprobantes de los ${ids.length} registros seleccionados a la cuenta de notificaciones del sistema?`, {
-            title: 'Enviar notificación', confirmText: 'Enviar'
+        const ok = await showConfirm(`¿Enviar ${ids.length} registro(s) a autorización? Se avisará por correo que la nómina quedó pendiente de autorizar. El comprobante de dispersión se enviará hasta que sea autorizada.`, {
+            title: 'Enviar a autorización', confirmText: 'Enviar'
         });
         if (!ok) return;
 
-        // El correo es solo una notificación interna informativa: si falla
-        // (SMTP caído, etc.) NO debe impedir que la nómina pase a
-        // "pendiente de autorización", que es la acción de negocio real.
-        // Por eso actualizarPayroll(ids) se llama siempre, sin importar si
-        // el correo se pudo enviar o no.
+        // Este correo NO es el comprobante de dispersión (ese sale hasta
+        // que la nómina se autoriza, en autorizarnomina.html): aquí solo se
+        // avisa que el folio quedó pendiente de autorización. Es una
+        // notificación interna informativa, así que si falla (SMTP caído,
+        // etc.) NO debe impedir que la nómina pase a "pendiente de
+        // autorización", que es la acción de negocio real. Por eso
+        // actualizarPayroll(ids) se llama siempre, sin importar si el correo
+        // se pudo enviar o no.
         fetch('/api/notificar-pago-masivo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -256,11 +259,11 @@ const fFin = item.PERIOD_END ? new Date(item.PERIOD_END).toLocaleDateString() : 
         .then(res => res.json())
         .then(res => {
             if (!res.success) {
-                showAlert("No se pudo enviar el correo de notificación (" + res.message + "), pero la nómina se enviará a autorización de todas formas.", "error");
+                showAlert("No se pudo enviar el aviso por correo (" + res.message + "), pero la nómina se enviará a autorización de todas formas.", "error");
             }
         })
         .catch(() => {
-            showAlert("No se pudo enviar el correo de notificación (error de conexión), pero la nómina se enviará a autorización de todas formas.", "error");
+            showAlert("No se pudo enviar el aviso por correo (error de conexión), pero la nómina se enviará a autorización de todas formas.", "error");
         })
         .finally(() => {
             // Solo los registros que el usuario seleccionó pasan a

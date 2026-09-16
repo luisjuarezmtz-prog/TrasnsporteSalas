@@ -126,7 +126,7 @@
         if (ids.length === 0) return;
 
         const mensajeConfirm = accion === 'autorizar'
-            ? `¿Autorizar ${ids.length} registro(s) de nómina? Esta acción los dejará cerrados.`
+            ? `¿Autorizar ${ids.length} registro(s) de nómina? Esta acción los dejará cerrados y enviará el comprobante de dispersión por correo.`
             : `¿Rechazar ${ids.length} registro(s) de nómina? Regresarán a edición en Revisar Nómina.`;
 
         const ok = await showConfirm(mensajeConfirm, {

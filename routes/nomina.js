@@ -6,6 +6,154 @@ const router = express.Router();
 const { db } = require('../config/db');
 const { transporter, CORREO_ADMIN } = require('../config/mailer');
 
+const CORREO_NOTIFICACIONES = 'admintransportesalas@gmail.com';
+
+// ─────────────────────── CORREOS DE NÓMINA ───────────────────────
+// Son dos correos distintos y se mandan en dos momentos distintos:
+//
+//   1. Aviso "pendiente de autorización" -> cuando la nómina sale de
+//      revisión y entra a la bandeja de autorización (POST
+//      /notificar-pago-masivo). Es informativo: avisa que se generó el
+//      folio y que está esperando autorización. NO lleva el detalle de
+//      la dispersión, porque todavía no se dispersa nada.
+//
+//   2. Comprobante de dispersión -> hasta que la nómina YA quedó
+//      autorizada (POST /autorizar-nomina con accion 'autorizar').
+//      Este sí lleva el desglose por empleado.
+//
+// Ninguno de los dos debe tumbar la operación si el SMTP falla: la
+// acción de negocio (pasar a autorización / autorizar) es lo que
+// importa, el correo es solo un aviso.
+
+// Trae el detalle de los registros indicados con lo que necesitan ambos
+// correos (nombre del empleado, folio, montos y fechas del periodo).
+function obtenerDetalleNomina(ids, callback) {
+  const query = `
+        SELECT
+            p.ID_PAYROLL,
+            CONCAT(e.FIRST_NAME, ' ', e.PARENTAL_LAST) AS EMPLEADO,
+            p.FOLIO,
+            p.NET_SALARY,
+            p.CASHIER_DISCOUNT,
+            p.INTERESES,
+            p.DESCUENTO_VENTA,
+            DATE_FORMAT(p.PAYMENT_DATE, '%d/%m/%Y') AS FECHA_PAGO,
+            DATE_FORMAT(p.PERIOD_START, '%d/%m/%Y') AS PERIODO_INICIO,
+            DATE_FORMAT(p.PERIOD_END, '%d/%m/%Y') AS PERIODO_FIN
+        FROM payroll p
+        INNER JOIN employees e ON p.ID_EMPLOYEE = e.ID_EMPLOYEE
+        WHERE p.ID_PAYROLL IN (?)`;
+
+  db.query(query, [ids], callback);
+}
+
+function totalesDe(registros) {
+  return registros.reduce((acc, row) => ({
+    neto: acc.neto + parseFloat(row.NET_SALARY || 0),
+    caja: acc.caja + parseFloat(row.CASHIER_DISCOUNT || 0),
+    intereses: acc.intereses + parseFloat(row.INTERESES || 0),
+    ventas: acc.ventas + parseFloat(row.DESCUENTO_VENTA || 0),
+  }), { neto: 0, caja: 0, intereses: 0, ventas: 0 });
+}
+
+// 1. AVISO: nómina generada y esperando autorización (sin desglose).
+function enviarAvisoPendienteAutorizacion(ids, callback) {
+  obtenerDetalleNomina(ids, (err, registros) => {
+    if (err) return callback(err);
+    if (registros.length === 0) return callback(new Error('No se encontraron los registros de nómina.'));
+
+    const folios = [...new Set(registros.map(r => r.FOLIO))];
+    const totales = totalesDe(registros);
+    const primero = registros[0];
+
+    const mailOptions = {
+      from: `"Sistema Transportes Salas" <${CORREO_ADMIN}>`,
+      to: CORREO_NOTIFICACIONES,
+      subject: `🕒 Nómina pendiente de autorización - Folio: ${folios.join(', ')}`,
+      html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; border: 1px solid #ddd; padding: 20px; border-radius: 10px;">
+                    <h2 style="color: #b8860b;">🕒 Nueva nómina en espera de autorización</h2>
+                    <p>Se generó una nueva nómina en el sistema y quedó en estatus <b>pendiente de autorización</b>.</p>
+                    <hr>
+                    <p><b>Folio:</b> <span style="background: #eee; padding: 5px;">${folios.join(', ')}</span></p>
+                    <p><b>Fecha de Pago:</b> ${primero.FECHA_PAGO}</p>
+                    <p><b>Periodo:</b> ${primero.PERIODO_INICIO} al ${primero.PERIODO_FIN}</p>
+                    <p><b>Total de Empleados:</b> ${registros.length}</p>
+                    <p><b>Monto Total Neto:</b> <span style="color: #28a745; font-weight: bold;">${totales.neto.toFixed(2)}</span></p>
+                    <hr>
+                    <p style="color:#b8860b;"><b>Todavía no se dispersa ningún pago.</b> El comprobante de dispersión con el desglose por empleado se enviará hasta que la nómina sea autorizada.</p>
+                    <p style="font-size: 12px; color: #666;">Este es un mensaje automático generado por el Sistema de Transportes Salas.</p>
+                </div>`
+    };
+
+    transporter.sendMail(mailOptions, callback);
+  });
+}
+
+// 2. COMPROBANTE DE DISPERSIÓN: solo cuando la nómina ya fue autorizada.
+function enviarComprobanteDispersion(ids, callback) {
+  obtenerDetalleNomina(ids, (err, registros) => {
+    if (err) return callback(err);
+    if (registros.length === 0) return callback(new Error('No se encontraron los registros de nómina.'));
+
+    const folios = [...new Set(registros.map(r => r.FOLIO))];
+    const totales = totalesDe(registros);
+
+    const filasTabla = registros.map(row => `
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${row.ID_PAYROLL}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${row.EMPLEADO}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${row.FOLIO}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${parseFloat(row.NET_SALARY || 0).toFixed(2)}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${parseFloat(row.CASHIER_DISCOUNT || 0).toFixed(2)}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${parseFloat(row.INTERESES || 0).toFixed(2)}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${parseFloat(row.DESCUENTO_VENTA || 0).toFixed(2)}</td>
+                </tr>`).join('');
+
+    const mailOptions = {
+      from: `"Sistema Transportes Salas" <${CORREO_ADMIN}>`,
+      to: CORREO_NOTIFICACIONES,
+      subject: `📋 Comprobante de Dispersión - Folio: ${folios.join(', ')} (${registros.length} pagos)`,
+      html: `
+                <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px;">
+                    <h2 style="color: #2c3e50;">✅ Nómina autorizada — Comprobante de dispersión</h2>
+                    <p>La nómina del folio <b>${folios.join(', ')}</b> quedó autorizada. Se dispersan los siguientes pagos:</p>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                        <thead>
+                            <tr style="background-color: #f8f9fa;">
+                                <th style="padding: 8px; border: 1px solid #ddd;">ID</th>
+                                <th style="padding: 8px; border: 1px solid #ddd;">Empleado</th>
+                                <th style="padding: 8px; border: 1px solid #ddd;">Folio</th>
+                                <th style="padding: 8px; border: 1px solid #ddd;">Monto Empleado</th>
+                                <th style="padding: 8px; border: 1px solid #ddd;">Monto Caja</th>
+                                <th style="padding: 8px; border: 1px solid #ddd;">Monto Intereses</th>
+                                <th style="padding: 8px; border: 1px solid #ddd;">Monto Ventas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filasTabla}
+                        </tbody>
+                        <tfoot>
+                            <tr style="font-weight: bold; background-color: #e9ecef;">
+                                <td colspan="3" style="padding: 8px; border: 1px solid #ddd; text-align: right;">TOTAL:</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #198754;">${totales.neto.toFixed(2)}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #198754;">${totales.caja.toFixed(2)}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #198754;">${totales.intereses.toFixed(2)}</td>
+                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #198754;">${totales.ventas.toFixed(2)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <p style="margin-top: 20px; font-size: 12px; color: #777;">
+                        Fecha de envío: ${new Date().toLocaleString()}<br>
+                        Este es un reporte automático de control administrativo.
+                    </p>
+                </div>`
+    };
+
+    transporter.sendMail(mailOptions, callback);
+  });
+}
+
 // --- RUTA 19: GUARDAR NÓMINA CON FOLIO Y NOTIFICACIÓN POR CORREO ---
 router.post('/guardar-nomina', (req, res) => {
   const { detalle } = req.body;
@@ -254,96 +402,16 @@ router.post('/notificar-pago-masivo', (req, res) => {
     return res.status(400).json({ success: false, message: 'No se seleccionaron registros.' });
   }
 
-  const query = `
-        SELECT
-            p.ID_PAYROLL,
-            CONCAT(e.FIRST_NAME, ' ', e.PARENTAL_LAST) AS EMPLEADO,
-            p.FOLIO,
-            p.NET_SALARY,
-            p.CASHIER_DISCOUNT,
-            p.INTERESES,
-            p.DESCUENTO_VENTA,
-            DATE_FORMAT(p.PAYMENT_DATE, '%d/%m/%Y') AS FECHA_PAGO
-        FROM payroll p
-        INNER JOIN employees e ON p.ID_EMPLOYEE = e.ID_EMPLOYEE
-        WHERE p.ID_PAYROLL IN (?)`;
-
-  db.query(query, [ids], (err, results) => {
-    if (err) {
-      console.error('Error al obtener datos para correo:', err);
-      return res.status(500).json({ success: false, message: 'Error al procesar la selección.' });
+  // Este paso ya NO manda el comprobante de dispersión: la nómina apenas
+  // va a entrar a la bandeja de autorización, no se ha dispersado nada.
+  // Aquí solo se avisa que se generó el folio y que quedó pendiente de
+  // autorizar. El comprobante sale en /autorizar-nomina.
+  enviarAvisoPendienteAutorizacion(ids, (error) => {
+    if (error) {
+      console.error('Error enviando aviso de nomina pendiente de autorizacion:', error);
+      return res.status(500).json({ success: false, message: 'No se pudo enviar el correo.' });
     }
-
-    let filasTabla = '';
-    let totalGeneral = 0;
-    let totalcaja = 0;
-    let totalinteres = 0;
-    let totalventa = 0;
-
-    results.forEach(row => {
-      totalGeneral += parseFloat(row.NET_SALARY);
-      totalcaja += parseFloat(row.CASHIER_DISCOUNT);
-      totalinteres += parseFloat(row.INTERESES);
-      totalventa += parseFloat(row.DESCUENTO_VENTA);
-      filasTabla += `
-                <tr>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${row.ID_PAYROLL}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${row.EMPLEADO}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${row.FOLIO}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">$${parseFloat(row.NET_SALARY).toFixed(2)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">$${parseFloat(row.CASHIER_DISCOUNT).toFixed(2)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">$${parseFloat(row.INTERESES).toFixed(2)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">$${parseFloat(row.DESCUENTO_VENTA).toFixed(2)}</td>
-                </tr>`;
-    });
-
-    const mailOptions = {
-      from: `"Sistema Transportes Salas" <${CORREO_ADMIN}>`,
-      to: 'admintransportesalas@gmail.com',
-      subject: `📋 Comprobante de Dispersión - ${results.length} Pagos`,
-      html: `
-                <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px;">
-                    <h2 style="color: #2c3e50;">Confirmación de Pagos Realizados</h2>
-                    <p>Se ha procesado la notificación de los siguientes registros de nómina:</p>
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
-                        <thead>
-                            <tr style="background-color: #f8f9fa;">
-                                <th style="padding: 8px; border: 1px solid #ddd;">ID</th>
-                                <th style="padding: 8px; border: 1px solid #ddd;">Empleado</th>
-                                <th style="padding: 8px; border: 1px solid #ddd;">Folio</th>
-                                <th style="padding: 8px; border: 1px solid #ddd;">Monto Empleado</th>
-                                <th style="padding: 8px; border: 1px solid #ddd;">Monto Caja</th>
-                                <th style="padding: 8px; border: 1px solid #ddd;">Monto Intereses</th>
-                                <th style="padding: 8px; border: 1px solid #ddd;">Monto Ventas</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${filasTabla}
-                        </tbody>
-                        <tfoot>
-                            <tr style="font-weight: bold; background-color: #e9ecef;">
-                                <td colspan="3" style="padding: 8px; border: 1px solid #ddd; text-align: right;">TOTAL:</td>
-                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #198754;">$${totalGeneral.toFixed(2)}</td>
-                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #198754;">$${totalcaja.toFixed(2)}</td>
-                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #198754;">$${totalinteres.toFixed(2)}</td>
-                                <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #198754;">$${totalventa.toFixed(2)}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                    <p style="margin-top: 20px; font-size: 12px; color: #777;">
-                        Fecha de envío: ${new Date().toLocaleString()}<br>
-                        Este es un reporte automático de control administrativo.
-                    </p>
-                </div>`
-    };
-
-    transporter.sendMail(mailOptions, (error) => {
-      if (error) {
-        console.error('Error enviando correo masivo:', error);
-        return res.status(500).json({ success: false, message: 'No se pudo enviar el correo.' });
-      }
-      res.json({ success: true, message: 'Notificación enviada con éxito.' });
-    });
+    res.json({ success: true, message: 'Notificación enviada con éxito.' });
   });
 });
 
@@ -495,6 +563,16 @@ router.post('/autorizar-nomina', (req, res) => {
         ? `${result.affectedRows} registro(s) autorizado(s) correctamente.`
         : `${result.affectedRows} registro(s) rechazado(s) y devueltos a edición.`
     });
+
+    // Ya autorizada: ahora sí sale el comprobante de dispersión con el
+    // desglose por empleado. Se manda después de responder y su error
+    // solo se registra en log: si el SMTP falla, la nómina ya quedó
+    // autorizada y no se debe revertir por un correo.
+    if (accion === 'autorizar' && result.affectedRows > 0) {
+      enviarComprobanteDispersion(ids, (errorMail) => {
+        if (errorMail) console.error('Error enviando comprobante de dispersion:', errorMail);
+      });
+    }
   });
 });
 
