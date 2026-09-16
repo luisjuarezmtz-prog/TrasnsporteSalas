@@ -127,12 +127,15 @@
 
             <div class="panel">
                 <h2>📊 Resumen de Viajes</h2>
-                <div class="grid grid-4" style="margin-bottom:18px;">
+                <div class="grid grid-3" style="margin-bottom:8px;">
                     <div class="stat-card"><div class="stat-label">Total Viajes</div><div id="rv-total-viajes" class="stat-value">—</div></div>
                     <div class="stat-card"><div class="stat-label">Ingresos</div><div id="rv-ingresos" class="stat-value ok">—</div></div>
-                    <div class="stat-card"><div class="stat-label">Gastos</div><div id="rv-gastos" class="stat-value bad">—</div></div>
-                    <div class="stat-card"><div class="stat-label">Utilidad</div><div id="rv-utilidad" class="stat-value amber">—</div></div>
+                    <div class="stat-card"><div class="stat-label">Gastos de Viajes</div><div id="rv-gastos" class="stat-value bad">—</div></div>
+                    <div class="stat-card"><div class="stat-label">Nómina</div><div id="rv-nomina" class="stat-value bad">—</div></div>
+                    <div class="stat-card"><div class="stat-label">Gasto Total</div><div id="rv-gastos-totales" class="stat-value bad">—</div></div>
+                    <div class="stat-card"><div class="stat-label">Utilidad Real</div><div id="rv-utilidad" class="stat-value amber">—</div></div>
                 </div>
+                <p class="hint" style="margin:0 0 18px;">La nómina se suma al gasto para calcular la utilidad real. Se cuenta el neto dispersado por fecha de pago, incluyendo los folios que todavía no se autorizan.</p>
                 <div class="grid grid-2" style="gap:24px;">
                     <div>
                         <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Viajes por Estatus</p>
@@ -145,7 +148,7 @@
                 </div>
                 <div class="grid grid-2" style="gap:24px;margin-top:24px;">
                     <div>
-                        <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Ingresos vs Gastos por Día</p>
+                        <p class="hint" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Ingresos vs Gastos y Nómina por Día</p>
                         <div style="position:relative;height:260px;"><canvas id="chartViajesTendencia"></canvas></div>
                     </div>
                     <div>
@@ -367,7 +370,10 @@
             document.getElementById('rv-total-viajes').textContent = datos.totales.viajes || 0;
             document.getElementById('rv-ingresos').textContent = formatMoney(datos.totales.ingresos);
             document.getElementById('rv-gastos').textContent = formatMoney(datos.totales.gastos);
-            document.getElementById('rv-utilidad').textContent = formatMoney((parseFloat(datos.totales.ingresos) || 0) - (parseFloat(datos.totales.gastos) || 0));
+            document.getElementById('rv-nomina').textContent = formatMoney(datos.totales.nomina);
+            document.getElementById('rv-gastos-totales').textContent = formatMoney(datos.totales.gastosTotales);
+            // La utilidad ya descuenta la nómina, no solo el gasto de los viajes.
+            document.getElementById('rv-utilidad').textContent = formatMoney((parseFloat(datos.totales.ingresos) || 0) - (parseFloat(datos.totales.gastosTotales) || 0));
 
             dibujarGrafica('chartViajesEstatus', {
                 type: 'doughnut',
@@ -393,7 +399,8 @@
                     labels: datos.porDia.map(r => formatearFechaCorta(r.fecha)),
                     datasets: [
                         { label: 'Ingresos', data: datos.porDia.map(r => r.ingresos), backgroundColor: colores[0] },
-                        { label: 'Gastos', data: datos.porDia.map(r => r.gastos), backgroundColor: colores[1] }
+                        { label: 'Gastos', data: datos.porDia.map(r => r.gastos), backgroundColor: colores[1] },
+                        { label: 'Nómina', data: datos.porDia.map(r => r.nomina), backgroundColor: colores[4] }
                     ]
                 },
                 options: { scales: opcionesEjes(), plugins: opcionesLeyenda(true) }

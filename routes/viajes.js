@@ -282,7 +282,9 @@ router.get('/dashboard-resumen', async (req, res) => {
       [porTipo],
       [porDia],
       [porCedi],
-      [porEmpleado]
+      [porEmpleado],
+      [nominaRows],
+      [nominaPorDia]
     ] = await Promise.all([
       dbPromesa.query(
         `SELECT
@@ -313,7 +315,7 @@ router.get('/dashboard-resumen', async (req, res) => {
         rango
       ),
       dbPromesa.query(
-        `SELECT p.DELIVERY_DATE AS fecha,
+        `SELECT DATE_FORMAT(p.DELIVERY_DATE, '%Y-%m-%d') AS fecha,
             COALESCE(SUM(CASE WHEN COALESCE(st.STATUS_NAME,'') != 'CANCELADO' THEN p.TRAVEL_COST ELSE 0 END), 0) AS ingresos,
             COALESCE(SUM(CASE WHEN COALESCE(st.STATUS_NAME,'') != 'CANCELADO' THEN p.COST_EXPENSES ELSE 0 END), 0) AS gastos
          FROM purchases_orders p
@@ -352,15 +354,68 @@ router.get('/dashboard-resumen', async (req, res) => {
          ORDER BY total DESC
          LIMIT 5`,
         rango
+      ),
+      // NÓMINA: se cuenta NET_SALARY, que es lo que realmente se dispersa
+      // (los descuentos de caja, intereses y ventas se quedan en la
+      // empresa, no son salida de dinero). Se toma por PAYMENT_DATE, y se
+      // incluyen TODOS los folios del periodo sin importar en qué punto
+      // del flujo de autorización estén: la nómina ya está comprometida
+      // como gasto aunque todavía no se autorice.
+      dbPromesa.query(
+        `SELECT COALESCE(SUM(NET_SALARY), 0) AS nomina
+         FROM payroll
+         WHERE PAYMENT_DATE BETWEEN ? AND ?`,
+        rango
+      ),
+      dbPromesa.query(
+        `SELECT DATE_FORMAT(PAYMENT_DATE, '%Y-%m-%d') AS fecha,
+            COALESCE(SUM(NET_SALARY), 0) AS nomina
+         FROM payroll
+         WHERE PAYMENT_DATE BETWEEN ? AND ?
+         GROUP BY PAYMENT_DATE
+         ORDER BY PAYMENT_DATE ASC`,
+        rango
       )
     ]);
 
+    // Las dos series vienen de tablas y fechas distintas (DELIVERY_DATE
+    // de los viajes, PAYMENT_DATE de la nómina), así que se cruzan por
+    // día: cualquier fecha que exista en una u otra aparece en la
+    // gráfica, con 0 en la serie que no tuvo movimiento ese día.
+    const dias = new Map();
+    for (const fila of porDia) {
+      dias.set(fila.fecha, {
+        fecha: fila.fecha,
+        ingresos: parseFloat(fila.ingresos) || 0,
+        gastos: parseFloat(fila.gastos) || 0,
+        nomina: 0
+      });
+    }
+    for (const fila of nominaPorDia) {
+      const dia = dias.get(fila.fecha) || { fecha: fila.fecha, ingresos: 0, gastos: 0, nomina: 0 };
+      dia.nomina = parseFloat(fila.nomina) || 0;
+      dias.set(fila.fecha, dia);
+    }
+    const porDiaConNomina = [...dias.values()].sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+    const totales = totalesRows[0] || { viajes: 0, ingresos: 0, gastos: 0 };
+    const gastosViajes = parseFloat(totales.gastos) || 0;
+    const nomina = parseFloat((nominaRows[0] || {}).nomina) || 0;
+
     res.json({
       success: true,
-      totales: totalesRows[0] || { viajes: 0, ingresos: 0, gastos: 0 },
+      totales: {
+        viajes: totales.viajes || 0,
+        ingresos: parseFloat(totales.ingresos) || 0,
+        gastos: gastosViajes,
+        nomina,
+        // Gasto real del periodo: lo que costaron los viajes más lo que
+        // se pagó de nómina.
+        gastosTotales: gastosViajes + nomina
+      },
       porEstatus,
       porTipo,
-      porDia,
+      porDia: porDiaConNomina,
       porCedi,
       porEmpleado
     });
