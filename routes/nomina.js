@@ -154,7 +154,11 @@ function enviarComprobanteDispersion(ids, callback) {
   });
 }
 
-// --- RUTA 19: GUARDAR NÓMINA CON FOLIO Y NOTIFICACIÓN POR CORREO ---
+// --- RUTA 19: GUARDAR NÓMINA CON FOLIO ---
+// Guardar la nómina NO manda correo. El primer aviso sale hasta que la
+// nómina entra a la bandeja de autorización (POST /notificar-pago-masivo)
+// y el comprobante de dispersión hasta que se autoriza
+// (POST /autorizar-nomina); ver los helpers de correo arriba.
 router.post('/guardar-nomina', (req, res) => {
   const { detalle } = req.body;
 
@@ -183,9 +187,7 @@ router.post('/guardar-nomina', (req, res) => {
     }
 
     // 3. PREPARAR DATOS PARA INSERT MASIVO
-    let montoTotalNomina = 0;
     const values = detalle.map(d => {
-      montoTotalNomina += parseFloat(d.net_salary || 0);
       return [
         d.id_employee,
         1, // ID_PSTATUS (Generada)
@@ -214,31 +216,6 @@ router.post('/guardar-nomina', (req, res) => {
         console.error('Error al insertar:', errInsert);
         return res.status(500).json({ success: false, message: 'Error al guardar registros.' });
       }
-
-      // 4. ENVIAR NOTIFICACIÓN POR CORREO
-      const mailOptions = {
-        from: `"Sistema Transportes Salas" <${CORREO_ADMIN}>`,
-        to: 'admintransportesalas@gmail.com',
-        subject: `💰 Nómina Generada - Folio: ${FOLIO_UNICO}`,
-        html: `
-                    <div style="font-family: Arial, sans-serif; border: 1px solid #ddd; padding: 20px; border-radius: 10px;">
-                        <h2 style="color: #007bff;">✅ Nómina Registrada Exitosamente</h2>
-                        <p>Se ha generado un nuevo registro de nómina en el sistema con los siguientes detalles:</p>
-                        <hr>
-                        <p><b>Folio de Operación:</b> <span style="background: #eee; padding: 5px;">${FOLIO_UNICO}</span></p>
-                        <p><b>Fecha de Pago:</b> ${payment_date}</p>
-                        <p><b>Periodo:</b> ${period_start} al ${period_end}</p>
-                        <p><b>Total de Empleados:</b> ${detalle.length}</p>
-                        <p><b>Monto Total Neto:</b> <span style="color: #28a745; font-weight: bold;">$${montoTotalNomina.toFixed(2)}</span></p>
-                        <hr>
-                        <p style="font-size: 12px; color: #666;">Este es un mensaje automático generado por el Sistema de Transportes Salas.</p>
-                    </div>
-                `
-      };
-
-      transporter.sendMail(mailOptions, (errorMail) => {
-        if (errorMail) console.error('Error enviando correo:', errorMail);
-      });
 
       res.json({
         success: true,
