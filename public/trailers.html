@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Tráileres - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>🚛 Registro de Tráileres</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<div class="panel">
+    <div class="grid" style="grid-template-columns:2fr 1fr auto auto;gap:12px;align-items:end;margin-bottom:18px;">
+        <div class="field">
+            <label>Buscar</label>
+            <input type="text" id="inputBusqueda" placeholder="No. económico, placas, marca o NIV">
+        </div>
+        <div class="field">
+            <label>Estatus</label>
+            <select id="selectEstatus">
+                <option value="todos">Todos</option>
+                <option value="1" selected>Activos</option>
+                <option value="0">Dados de baja</option>
+            </select>
+        </div>
+        <button class="primary" onclick="cargarTrailers()">🔍 Buscar</button>
+        <button class="primary" onclick="abrirModalAlta()">➕ Nuevo Tráiler</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>No. Económico</th>
+                <th>Placas</th>
+                <th>Marca / Año</th>
+                <th>NIV / Serie</th>
+                <th>Clase</th>
+                <th class="text-center">Docs.</th>
+                <th>Estatus</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            <tr><td colspan="8" class="text-center hint">Cargando tráileres...</td></tr>
+        </tbody>
+    </table>
+    <p class="hint" id="contadorRegistros" style="margin-top:10px;"></p>
+</div>
+
+<!-- MODAL ALTA / CAMBIO -->
+<div class="modal fade" id="modalTrailer" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloModalTrailer">➕ Nuevo Tráiler</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formTrailer">
+                    <input type="hidden" id="edit_id">
+
+                    <h6 class="seccion">Identificación</h6>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>No. Económico</label>
+                            <input type="text" id="NO_ECONOMICO">
+                        </div>
+                        <div class="field">
+                            <label>Placas *</label>
+                            <input type="text" id="PLACAS" required maxlength="20" style="text-transform:uppercase;">
+                        </div>
+                        <div class="field">
+                            <label>Tipo de Vehículo</label>
+                            <input type="text" id="TIPO_VEHICULO" placeholder="Ej. TRACTOR">
+                        </div>
+                    </div>
+
+                    <h6 class="seccion">Titular / Propietario</h6>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Nombre o Razón Social</label>
+                            <input type="text" id="RAZON_SOCIAL">
+                        </div>
+                        <div class="field">
+                            <label>RFC</label>
+                            <input type="text" id="RFC" maxlength="13" style="text-transform:uppercase;">
+                        </div>
+                        <div class="field">
+                            <label>Propietario del Vehículo</label>
+                            <input type="text" id="PROPIETARIO_VEHICULO">
+                        </div>
+                    </div>
+
+                    <h6 class="seccion">Domicilio</h6>
+                    <div class="grid grid-3" style="margin-bottom:10px;">
+                        <div class="field">
+                            <label>Calle</label>
+                            <input type="text" id="DOMICILIO_CALLE">
+                        </div>
+                        <div class="field">
+                            <label>Número</label>
+                            <input type="text" id="DOMICILIO_NUMERO">
+                        </div>
+                        <div class="field">
+                            <label>Colonia</label>
+                            <input type="text" id="DOMICILIO_COLONIA">
+                        </div>
+                    </div>
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Código Postal</label>
+                            <input type="text" id="DOMICILIO_CP" maxlength="10">
+                        </div>
+                        <div class="field">
+                            <label>Domicilio Fiscal</label>
+                            <input type="text" id="DOMICILIO_FISCAL">
+                        </div>
+                    </div>
+
+                    <h6 class="seccion">Datos del Vehículo</h6>
+                    <div class="grid grid-3" style="margin-bottom:10px;">
+                        <div class="field">
+                            <label>Modalidad</label>
+                            <input type="text" id="MODALIDAD" placeholder="Ej. GENERAL">
+                        </div>
+                        <div class="field">
+                            <label>Marca</label>
+                            <input type="text" id="MARCA">
+                        </div>
+                        <div class="field">
+                            <label>Año Modelo</label>
+                            <input type="text" id="ANIO_MODELO" maxlength="10">
+                        </div>
+                    </div>
+                    <div class="grid grid-3" style="margin-bottom:10px;">
+                        <div class="field">
+                            <label>NIV / No. de Serie</label>
+                            <input type="text" id="NIV_SERIE">
+                        </div>
+                        <div class="field">
+                            <label>Motor</label>
+                            <input type="text" id="MOTOR">
+                        </div>
+                        <div class="field">
+                            <label>Clase</label>
+                            <input type="text" id="CLASE" placeholder="Ej. T 3">
+                        </div>
+                    </div>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Combustible</label>
+                            <input type="text" id="COMBUSTIBLE" placeholder="Ej. DIESEL">
+                        </div>
+                        <div class="field">
+                            <label>No. de Ejes</label>
+                            <input type="number" id="NUM_EJES" min="0" step="1">
+                        </div>
+                        <div class="field">
+                            <label>No. de Llantas</label>
+                            <input type="number" id="NUM_LLANTAS" min="0" step="1">
+                        </div>
+                    </div>
+
+                    <h6 class="seccion">Capacidad y Dimensiones</h6>
+                    <div class="grid grid-4" style="margin-bottom:10px;">
+                        <div class="field">
+                            <label>Litros</label>
+                            <input type="number" id="CAPACIDAD_LITROS" min="0" step="0.01">
+                        </div>
+                        <div class="field">
+                            <label>Toneladas</label>
+                            <input type="number" id="CAPACIDAD_TONELADAS" min="0" step="0.01">
+                        </div>
+                        <div class="field">
+                            <label>Personas</label>
+                            <input type="number" id="CAPACIDAD_PERSONAS" min="0" step="1">
+                        </div>
+                        <div class="field">
+                            <label>Peso Vehicular</label>
+                            <input type="number" id="PESO_VEHICULAR" min="0" step="0.01">
+                        </div>
+                    </div>
+                    <div class="grid grid-3" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Alto (m)</label>
+                            <input type="number" id="ALTO_M" min="0" step="0.01">
+                        </div>
+                        <div class="field">
+                            <label>Ancho (m)</label>
+                            <input type="number" id="ANCHO_M" min="0" step="0.01">
+                        </div>
+                        <div class="field">
+                            <label>Largo (m)</label>
+                            <input type="number" id="LARGO_M" min="0" step="0.01">
+                        </div>
+                    </div>
+
+                    <h6 class="seccion">Suspensión y Ejes</h6>
+                    <div class="grid grid-4" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Tipo de Suspensión</label>
+                            <input type="text" id="TIPO_SUSPENSION" placeholder="Ej. MECÁNICA">
+                        </div>
+                        <div class="field">
+                            <label>Eje Direccional</label>
+                            <input type="text" id="EJE_DIRECCIONAL">
+                        </div>
+                        <div class="field">
+                            <label>Eje Motriz</label>
+                            <input type="text" id="EJE_MOTRIZ">
+                        </div>
+                        <div class="field">
+                            <label>Eje de Arrastre</label>
+                            <input type="text" id="EJE_ARRASTRE">
+                        </div>
+                    </div>
+
+                    <h6 class="seccion">Datos del Documento</h6>
+                    <div class="grid grid-3" style="margin-bottom:10px;">
+                        <div class="field">
+                            <label>Permiso de Ruta</label>
+                            <input type="text" id="PERMISO_RUTA">
+                        </div>
+                        <div class="field">
+                            <label>Folio</label>
+                            <input type="text" id="FOLIO">
+                        </div>
+                        <div class="field">
+                            <label>Folio Serie</label>
+                            <input type="text" id="FOLIO_SERIE">
+                        </div>
+                    </div>
+                    <div class="grid grid-2" style="margin-bottom:10px;">
+                        <div class="field">
+                            <label>Trámite</label>
+                            <input type="text" id="TRAMITE" placeholder="Ej. ALTA VEHICULAR">
+                        </div>
+                        <div class="field">
+                            <label>Lugar de Expedición</label>
+                            <input type="text" id="LUGAR_EXPEDICION">
+                        </div>
+                    </div>
+                    <div class="grid grid-2" style="margin-bottom:14px;">
+                        <div class="field">
+                            <label>Fecha de Expedición</label>
+                            <input type="date" id="FECHA_EXPEDICION">
+                        </div>
+                        <div class="field">
+                            <label>Fecha Límite de Sustitución</label>
+                            <input type="date" id="FECHA_LIMITE_SUSTITUCION">
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Los documentos necesitan que el tráiler ya exista (se suben
+                     contra su ID), así que esta sección se habilita solo al editar. -->
+                <div id="seccionDocumentos">
+                    <h6 class="seccion">Documentos</h6>
+                    <p class="hint" id="avisoDocumentos" style="margin:0 0 12px;">Guarda primero el tráiler para poder subir documentos.</p>
+                    <div class="grid" style="grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin-bottom:14px;">
+                        <div class="field">
+                            <label>Tipo de Documento</label>
+                            <select id="select_tipo_documento">
+                                <option value="">-- Seleccione --</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Archivo (PDF, JPG o PNG)</label>
+                            <input type="file" id="input_documento" accept="application/pdf,image/png,image/jpeg">
+                        </div>
+                        <button type="button" class="ghost" onclick="agregarDocumento()">➕ Agregar</button>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Archivo</th>
+                                <th>Fecha</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaDocumentosCuerpo">
+                            <tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" onclick="guardarTrailer()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .seccion {
+        font-family: var(--mono); font-size: 12px; text-transform: uppercase;
+        color: var(--amber); border-bottom: 1px solid var(--line);
+        padding-bottom: 6px; margin: 22px 0 14px;
+    }
+    .seccion:first-of-type { margin-top: 0; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    // Los mismos campos que acepta routes/trailers.js. El id de cada input
+    // es el nombre de la columna, así que el formulario se llena y se lee
+    // recorriendo esta lista en vez de campo por campo.
+    const CAMPOS = [
+        'NO_ECONOMICO', 'PLACAS',
+        'RAZON_SOCIAL', 'RFC', 'PROPIETARIO_VEHICULO',
+        'DOMICILIO_CALLE', 'DOMICILIO_NUMERO', 'DOMICILIO_COLONIA', 'DOMICILIO_CP', 'DOMICILIO_FISCAL',
+        'MODALIDAD', 'MARCA', 'ANIO_MODELO', 'NIV_SERIE', 'MOTOR', 'TIPO_VEHICULO', 'CLASE',
+        'COMBUSTIBLE', 'NUM_EJES', 'NUM_LLANTAS',
+        'CAPACIDAD_LITROS', 'CAPACIDAD_TONELADAS', 'CAPACIDAD_PERSONAS',
+        'ALTO_M', 'ANCHO_M', 'LARGO_M', 'PESO_VEHICULAR',
+        'TIPO_SUSPENSION', 'EJE_DIRECCIONAL', 'EJE_MOTRIZ', 'EJE_ARRASTRE',
+        'PERMISO_RUTA', 'FOLIO', 'FOLIO_SERIE', 'TRAMITE',
+        'LUGAR_EXPEDICION', 'FECHA_EXPEDICION', 'FECHA_LIMITE_SUSTITUCION',
+    ];
+    const CAMPOS_FECHA = ['FECHA_EXPEDICION', 'FECHA_LIMITE_SUSTITUCION'];
+
+    let modalTrailer;
+    let trailersCargados = [];
+
+    // Las fechas llegan del servidor como ISO; el input type=date necesita
+    // solo YYYY-MM-DD, y sin la corrección de zona se recorre un día.
+    function aValorDeInput(valor) {
+        if (!valor) return '';
+        const d = new Date(valor);
+        if (isNaN(d.getTime())) return '';
+        d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+        return d.toISOString().split('T')[0];
+    }
+
+    function formatoFecha(valor) {
+        if (!valor) return '—';
+        const d = new Date(valor);
+        if (isNaN(d.getTime())) return '—';
+        d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+        return d.toLocaleDateString('es-MX');
+    }
+
+    // ───────────────────────── LISTADO ─────────────────────────
+    async function cargarTrailers() {
+        const tbody = document.getElementById('tablaCuerpo');
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center hint">Cargando tráileres...</td></tr>';
+
+        try {
+            const res = await fetch('/api/trailers-consulta');
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || 'Respuesta no válida');
+
+            trailersCargados = json.data;
+            pintarTabla();
+        } catch (error) {
+            console.error('Error al cargar tráileres:', error);
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="color:var(--bad);">No se pudo cargar la lista de tráileres.</td></tr>';
+        }
+    }
+
+    function pintarTabla() {
+        const tbody = document.getElementById('tablaCuerpo');
+        const busqueda = document.getElementById('inputBusqueda').value.trim().toLowerCase();
+        const estatus = document.getElementById('selectEstatus').value;
+
+        const filas = trailersCargados.filter(t => {
+            if (estatus !== 'todos' && String(t.STATUS) !== estatus) return false;
+            if (!busqueda) return true;
+            return [t.NO_ECONOMICO, t.PLACAS, t.MARCA, t.NIV_SERIE]
+                .some(v => String(v ?? '').toLowerCase().includes(busqueda));
+        });
+
+        document.getElementById('contadorRegistros').textContent =
+            `Mostrando ${filas.length} de ${trailersCargados.length} tráileres registrados`;
+
+        if (filas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center hint">No hay tráileres que coincidan con el filtro.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        filas.forEach(t => {
+            const activo = Number(t.STATUS) === 1;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-family:var(--mono);font-weight:700;">${escapeHtml(t.NO_ECONOMICO || '—')}</td>
+                <td style="font-family:var(--mono);text-transform:uppercase;">${escapeHtml(t.PLACAS)}</td>
+                <td>${escapeHtml(t.MARCA || '—')}${t.ANIO_MODELO ? ' / ' + escapeHtml(t.ANIO_MODELO) : ''}</td>
+                <td style="font-family:var(--mono);">${escapeHtml(t.NIV_SERIE || '—')}</td>
+                <td>${escapeHtml(t.CLASE || '—')}</td>
+                <td class="text-center">${t.TOTAL_DOCUMENTOS || 0}</td>
+                <td><span class="badge ${activo ? 'badge-ok' : 'badge-muted'}">${activo ? 'Activo' : 'Baja'}</span></td>
+                <td class="text-center">
+                    <button class="ghost" title="Editar" onclick="abrirModalEdicion(${t.ID_TRAILER})">✏️</button>
+                    <button class="ghost" title="${activo ? 'Dar de baja' : 'Reactivar'}" onclick="cambiarEstatus(${t.ID_TRAILER}, ${activo ? 0 : 1})">${activo ? '🚫' : '♻️'}</button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // ───────────────────────── ALTA / CAMBIO ─────────────────────────
+    function limpiarFormulario() {
+        document.getElementById('edit_id').value = '';
+        CAMPOS.forEach(campo => { document.getElementById(campo).value = ''; });
+        document.getElementById('tablaDocumentosCuerpo').innerHTML =
+            '<tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>';
+    }
+
+    // Sin tráiler guardado no hay ID contra el cual subir archivos.
+    function habilitarDocumentos(habilitado) {
+        document.getElementById('select_tipo_documento').disabled = !habilitado;
+        document.getElementById('input_documento').disabled = !habilitado;
+        document.querySelector('#seccionDocumentos button').disabled = !habilitado;
+        document.getElementById('avisoDocumentos').hidden = habilitado;
+    }
+
+    function abrirModalAlta() {
+        limpiarFormulario();
+        document.getElementById('tituloModalTrailer').textContent = '➕ Nuevo Tráiler';
+        habilitarDocumentos(false);
+        modalTrailer.show();
+    }
+
+    async function abrirModalEdicion(id) {
+        limpiarFormulario();
+        document.getElementById('tituloModalTrailer').textContent = '✏️ Editar Tráiler';
+
+        try {
+            const res = await fetch(`/api/trailers/${id}`);
+            const json = await res.json();
+            if (!json.success) return showAlert(json.message || 'No se pudo cargar el tráiler.', 'error');
+
+            document.getElementById('edit_id').value = id;
+            CAMPOS.forEach(campo => {
+                const valor = json.data[campo];
+                document.getElementById(campo).value = CAMPOS_FECHA.includes(campo)
+                    ? aValorDeInput(valor)
+                    : (valor ?? '');
+            });
+
+            habilitarDocumentos(true);
+            cargarDocumentos(id);
+            modalTrailer.show();
+        } catch (error) {
+            console.error('Error al cargar el tráiler:', error);
+            showAlert('Error de conexión al cargar el tráiler.', 'error');
+        }
+    }
+
+    async function guardarTrailer() {
+        const id = document.getElementById('edit_id').value;
+        const datos = {};
+        CAMPOS.forEach(campo => { datos[campo] = document.getElementById(campo).value.trim(); });
+
+        if (!datos.PLACAS) return showAlert('Las placas son obligatorias.', 'info');
+
+        try {
+            const res = await fetch(id ? `/api/trailers/${id}` : '/api/trailers', {
+                method: id ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(datos)
+            });
+            const json = await res.json();
+
+            if (!json.success) return showAlert(json.message || 'No se pudo guardar.', 'error');
+
+            showAlert(json.message, 'success');
+            cargarTrailers();
+
+            // Tras el alta el modal se queda abierto en modo edición para
+            // poder subir los documentos sin volver a buscar el registro.
+            if (!id) {
+                document.getElementById('edit_id').value = json.id_trailer;
+                document.getElementById('tituloModalTrailer').textContent = '✏️ Editar Tráiler';
+                habilitarDocumentos(true);
+                cargarDocumentos(json.id_trailer);
+            }
+        } catch (error) {
+            console.error('Error al guardar el tráiler:', error);
+            showAlert('Error de conexión al guardar.', 'error');
+        }
+    }
+
+    async function cambiarEstatus(id, status) {
+        const ok = await showConfirm(
+            status === 0 ? '¿Dar de baja este tráiler?' : '¿Reactivar este tráiler?',
+            { type: status === 0 ? 'danger' : 'success', title: status === 0 ? 'Dar de baja' : 'Reactivar' }
+        );
+        if (!ok) return;
+
+        try {
+            const res = await fetch(`/api/trailers/${id}/estatus`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) cargarTrailers();
+        } catch (error) {
+            console.error('Error al cambiar el estatus:', error);
+            showAlert('Error de conexión al cambiar el estatus.', 'error');
+        }
+    }
+
+    // ───────────────────────── DOCUMENTOS ─────────────────────────
+    async function cargarCatalogos() {
+        try {
+            const res = await fetch('/api/trailers-catalogos');
+            const json = await res.json();
+            if (!json.success) return;
+
+            const select = document.getElementById('select_tipo_documento');
+            select.innerHTML = '<option value="">-- Seleccione --</option>';
+            json.tiposDocumento.forEach(tipo => {
+                const option = document.createElement('option');
+                option.value = tipo.ID_DOCUMENT_TYPE;
+                option.textContent = tipo.DOCUMENT_TYPE_NAME;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error al cargar catálogos:', error);
+        }
+    }
+
+    async function cargarDocumentos(idTrailer) {
+        const tbody = document.getElementById('tablaDocumentosCuerpo');
+        try {
+            const res = await fetch(`/api/trailers/${idTrailer}/documentos`);
+            const json = await res.json();
+
+            if (!json.success || json.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            json.data.forEach(doc => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escapeHtml(doc.DOCUMENT_TYPE_NAME)}</td>
+                    <td><a href="${escapeHtml(doc.FILE_PATH)}" target="_blank" rel="noopener">${escapeHtml(doc.FILE_NAME)}</a></td>
+                    <td>${formatoFecha(doc.UPLOAD_DATE)}</td>
+                    <td class="text-center">
+                        <button class="ghost" title="Eliminar" onclick="eliminarDocumento(${doc.ID_DOCUMENT})">🗑️</button>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
+        } catch (error) {
+            console.error('Error al cargar documentos:', error);
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color:var(--bad);">No se pudieron cargar los documentos.</td></tr>';
+        }
+    }
+
+    async function agregarDocumento() {
+        const idTrailer = document.getElementById('edit_id').value;
+        const idTipo = document.getElementById('select_tipo_documento').value;
+        const input = document.getElementById('input_documento');
+
+        if (!idTrailer) return showAlert('Guarda primero el tráiler.', 'info');
+        if (!idTipo) return showAlert('Selecciona el tipo de documento.', 'info');
+        if (!input.files[0]) return showAlert('Selecciona un archivo.', 'info');
+
+        const formData = new FormData();
+        formData.append('documento', input.files[0]);
+        formData.append('id_document_type', idTipo);
+
+        try {
+            const res = await fetch(`/api/trailers/${idTrailer}/documentos`, { method: 'POST', body: formData });
+            const json = await res.json();
+
+            if (!json.success) return showAlert(json.message || 'No se pudo subir el documento.', 'error');
+
+            showAlert(json.message, 'success');
+            input.value = '';
+            document.getElementById('select_tipo_documento').value = '';
+            cargarDocumentos(idTrailer);
+            cargarTrailers();
+        } catch (error) {
+            console.error('Error al subir documento:', error);
+            showAlert('Error de conexión al subir el documento.', 'error');
+        }
+    }
+
+    async function eliminarDocumento(idDocumento) {
+        const ok = await showConfirm('¿Eliminar este documento?', { type: 'danger', title: 'Eliminar documento' });
+        if (!ok) return;
+
+        try {
+            const res = await fetch(`/api/trailers/documentos/${idDocumento}`, { method: 'DELETE' });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) {
+                cargarDocumentos(document.getElementById('edit_id').value);
+                cargarTrailers();
+            }
+        } catch (error) {
+            console.error('Error al eliminar documento:', error);
+            showAlert('Error de conexión al eliminar el documento.', 'error');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        modalTrailer = new bootstrap.Modal(document.getElementById('modalTrailer'));
+        document.getElementById('inputBusqueda').addEventListener('input', pintarTabla);
+        document.getElementById('selectEstatus').addEventListener('change', pintarTabla);
+        cargarCatalogos();
+        cargarTrailers();
+    });
+</script>
+
+</body>
+</html>
