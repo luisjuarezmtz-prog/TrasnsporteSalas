@@ -284,7 +284,9 @@ router.get('/dashboard-resumen', async (req, res) => {
       [porCedi],
       [porEmpleado],
       [nominaRows],
-      [nominaPorDia]
+      [nominaPorDia],
+      [movimientosRows],
+      [movimientosPorDia]
     ] = await Promise.all([
       dbPromesa.query(
         `SELECT
@@ -375,6 +377,25 @@ router.get('/dashboard-resumen', async (req, res) => {
          GROUP BY PAYMENT_DATE
          ORDER BY PAYMENT_DATE ASC`,
         rango
+      ),
+      // MOVIMIENTOS DE VIAJE: lo que se le paga al operador por cada
+      // IDA/VUELTA. Es costo -- routes/cxc.js ya lo trata como tal y lo
+      // nombra COSTO -- así que resta para la utilidad real. Se filtra
+      // por MOVEMENT_DATE, igual que el panel de Movimientos.
+      dbPromesa.query(
+        `SELECT COALESCE(SUM(AMOUNT), 0) AS movimientos
+         FROM travels_movements
+         WHERE MOVEMENT_DATE BETWEEN ? AND ?`,
+        rango
+      ),
+      dbPromesa.query(
+        `SELECT DATE_FORMAT(MOVEMENT_DATE, '%Y-%m-%d') AS fecha,
+            COALESCE(SUM(AMOUNT), 0) AS movimientos
+         FROM travels_movements
+         WHERE MOVEMENT_DATE BETWEEN ? AND ?
+         GROUP BY MOVEMENT_DATE
+         ORDER BY MOVEMENT_DATE ASC`,
+        rango
       )
     ]);
 
@@ -382,18 +403,24 @@ router.get('/dashboard-resumen', async (req, res) => {
     // de los viajes, PAYMENT_DATE de la nómina), así que se cruzan por
     // día: cualquier fecha que exista en una u otra aparece en la
     // gráfica, con 0 en la serie que no tuvo movimiento ese día.
+    const diaVacio = (fecha) => ({ fecha, ingresos: 0, gastos: 0, nomina: 0, movimientos: 0 });
+
     const dias = new Map();
     for (const fila of porDia) {
       dias.set(fila.fecha, {
-        fecha: fila.fecha,
+        ...diaVacio(fila.fecha),
         ingresos: parseFloat(fila.ingresos) || 0,
-        gastos: parseFloat(fila.gastos) || 0,
-        nomina: 0
+        gastos: parseFloat(fila.gastos) || 0
       });
     }
     for (const fila of nominaPorDia) {
-      const dia = dias.get(fila.fecha) || { fecha: fila.fecha, ingresos: 0, gastos: 0, nomina: 0 };
+      const dia = dias.get(fila.fecha) || diaVacio(fila.fecha);
       dia.nomina = parseFloat(fila.nomina) || 0;
+      dias.set(fila.fecha, dia);
+    }
+    for (const fila of movimientosPorDia) {
+      const dia = dias.get(fila.fecha) || diaVacio(fila.fecha);
+      dia.movimientos = parseFloat(fila.movimientos) || 0;
       dias.set(fila.fecha, dia);
     }
     const porDiaConNomina = [...dias.values()].sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -401,6 +428,7 @@ router.get('/dashboard-resumen', async (req, res) => {
     const totales = totalesRows[0] || { viajes: 0, ingresos: 0, gastos: 0 };
     const gastosViajes = parseFloat(totales.gastos) || 0;
     const nomina = parseFloat((nominaRows[0] || {}).nomina) || 0;
+    const movimientos = parseFloat((movimientosRows[0] || {}).movimientos) || 0;
 
     res.json({
       success: true,
@@ -409,9 +437,11 @@ router.get('/dashboard-resumen', async (req, res) => {
         ingresos: parseFloat(totales.ingresos) || 0,
         gastos: gastosViajes,
         nomina,
-        // Gasto real del periodo: lo que costaron los viajes más lo que
-        // se pagó de nómina.
-        gastosTotales: gastosViajes + nomina
+        movimientos,
+        // Gasto real del periodo: lo que costaron los viajes, más la
+        // nómina, más lo que se le pagó a los operadores por los
+        // movimientos de viaje.
+        gastosTotales: gastosViajes + nomina + movimientos
       },
       porEstatus,
       porTipo,
