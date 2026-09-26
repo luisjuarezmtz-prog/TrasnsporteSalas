@@ -63,6 +63,7 @@
                 <th>Folio OC</th>
                 <th>Tipo</th>
                 <th>Concepto</th>
+                <th class="text-center">Puntos</th>
                 <th>Unidad</th>
                 <th>Proveedor</th>
                 <th>Solicitud</th>
@@ -74,7 +75,7 @@
             </tr>
         </thead>
         <tbody id="tablaCuerpo">
-            <tr><td colspan="11" class="text-center hint">Cargando...</td></tr>
+            <tr><td colspan="12" class="text-center hint">Cargando...</td></tr>
         </tbody>
     </table>
     <p class="hint" id="contador" style="margin-top:10px;"></p>
@@ -168,6 +169,53 @@
 
                 <!-- Solo aplica una vez que la orden existe -->
                 <div id="bloquePosterior" hidden>
+                    <h6 class="seccion">Puntos realizados</h6>
+                    <p class="hint" style="margin:0 0 12px;">
+                        Captura renglón por renglón lo que se hizo. Es una lista abierta, no un
+                        checklist: el trabajo de taller varía demasiado para encasillarlo, y el
+                        <a href="comparativomantenimientos.html">comparativo</a> usa este texto para
+                        detectar cuándo se repite el mismo trabajo en una unidad.
+                    </p>
+                    <div class="grid" style="grid-template-columns:3fr 1fr 1fr 2fr auto;gap:12px;align-items:end;margin-bottom:12px;">
+                        <div class="field">
+                            <label>Punto realizado</label>
+                            <input type="text" id="puntoDescripcion" placeholder="Ej. Cambio de balatas eje trasero">
+                        </div>
+                        <div class="field">
+                            <label>Cantidad</label>
+                            <input type="number" id="puntoCantidad" min="0" step="0.01" value="1">
+                        </div>
+                        <div class="field">
+                            <label>Costo</label>
+                            <input type="number" id="puntoCosto" min="0" step="0.01">
+                        </div>
+                        <div class="field">
+                            <label>Observaciones</label>
+                            <input type="text" id="puntoObservaciones">
+                        </div>
+                        <button type="button" class="ghost" onclick="agregarPunto()">➕ Agregar</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:40px;">#</th>
+                                <th>Punto realizado</th>
+                                <th class="text-right">Cant.</th>
+                                <th class="text-right">Costo</th>
+                                <th>Observaciones</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaPuntos"><tr><td colspan="6" class="text-center hint">Sin puntos capturados.</td></tr></tbody>
+                        <tfoot>
+                            <tr style="font-weight:700;">
+                                <td colspan="3" class="text-right">SUMA DE PUNTOS:</td>
+                                <td class="text-right" id="totalPuntos">—</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
                     <h6 class="seccion">Pago</h6>
                     <div class="grid" style="grid-template-columns:1fr auto auto;gap:12px;align-items:end;margin-bottom:8px;">
                         <div class="field">
@@ -331,7 +379,7 @@
     // ───────────────────────── LISTADO ─────────────────────────
     async function cargarLista() {
         const tbody = document.getElementById('tablaCuerpo');
-        tbody.innerHTML = '<tr><td colspan="11" class="text-center hint">Cargando...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center hint">Cargando...</td></tr>';
 
         const params = new URLSearchParams();
         const tipo = document.getElementById('filtroTipo').value;
@@ -347,7 +395,7 @@
             const json = await res.json();
 
             if (!json.success || json.data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" class="text-center hint">No hay órdenes registradas.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" class="text-center hint">No hay órdenes registradas.</td></tr>';
                 document.getElementById('contador').textContent = '';
                 pintarKpis([]);
                 return;
@@ -362,6 +410,7 @@
                     <td style="font-family:var(--mono);font-weight:700;">${escapeHtml(m.FOLIO_OC || '—')}</td>
                     <td>${m.TIPO === 'GESTORIA' ? '📋 Gestoría' : '🔧 Mantto.'}</td>
                     <td>${escapeHtml(m.CONCEPTO)}</td>
+                    <td class="text-center">${m.TOTAL_PUNTOS || 0}</td>
                     <td style="font-family:var(--mono);">${escapeHtml(m.UNIDAD_PLACAS || '—')}${m.NO_ECONOMICO ? `<span class="hint" style="display:block;">${escapeHtml(m.NO_ECONOMICO)}</span>` : ''}</td>
                     <td>${escapeHtml(m.PROVEEDOR || '—')}</td>
                     <td>${formatoFecha(m.FECHA_SOLICITUD)}</td>
@@ -381,7 +430,7 @@
             pintarKpis(json.data);
         } catch (error) {
             console.error('Error al cargar la lista:', error);
-            tbody.innerHTML = '<tr><td colspan="11" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="12" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
         }
     }
 
@@ -488,6 +537,7 @@
             document.getElementById('avisoPago').innerHTML = m.FECHA_PAGO
                 ? `Pagada el <b>${formatoFecha(m.FECHA_PAGO)}</b>. Sube el comprobante de pago con el tipo correspondiente.`
                 : 'Concluir y pagar son momentos distintos: se puede entregar el trabajo un día y liquidarlo otro.';
+            pintarPuntos(m.puntos || []);
             pintarDocumentos(m.documentos || []);
 
             modalOrden.show();
@@ -607,6 +657,86 @@
         }
     }
 
+    // ───────────────────────── PUNTOS REALIZADOS ─────────────────────────
+    function pintarPuntos(puntos) {
+        const tbody = document.getElementById('tablaPuntos');
+        const total = document.getElementById('totalPuntos');
+
+        if (puntos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center hint">Sin puntos capturados.</td></tr>';
+            total.textContent = '—';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        let suma = 0;
+        let hayCostos = false;
+        puntos.forEach((p, i) => {
+            if (p.COSTO !== null && p.COSTO !== undefined) { suma += Number(p.COSTO); hayCostos = true; }
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="hint">${i + 1}</td>
+                <td>${escapeHtml(p.DESCRIPCION)}</td>
+                <td class="text-right">${Number(p.CANTIDAD)}</td>
+                <td class="text-right">${p.COSTO !== null && p.COSTO !== undefined ? formatMoney(p.COSTO) : '—'}</td>
+                <td>${escapeHtml(p.OBSERVACIONES || '')}</td>
+                <td class="text-center"><button class="ghost" title="Eliminar" onclick="eliminarPunto(${p.ID_DETALLE})">🗑️</button></td>`;
+            tbody.appendChild(tr);
+        });
+
+        // La suma solo se muestra si alguien capturó costos: un 0 podría
+        // leerse como "no costó nada" cuando en realidad no se capturó.
+        total.textContent = hayCostos ? formatMoney(suma) : '—';
+    }
+
+    async function agregarPunto() {
+        const id = document.getElementById('edit_id').value;
+        const descripcion = document.getElementById('puntoDescripcion').value.trim();
+        if (!id) return showAlert('Guarda primero la orden.', 'info');
+        if (!descripcion) return showAlert('Captura el punto realizado.', 'info');
+
+        try {
+            const res = await fetch(`/api/mantenimientos/${id}/detalle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    descripcion,
+                    cantidad: document.getElementById('puntoCantidad').value || 1,
+                    costo: document.getElementById('puntoCosto').value,
+                    observaciones: document.getElementById('puntoObservaciones').value,
+                }),
+            });
+            const json = await res.json();
+            if (!json.success) return showAlert(json.message, 'error');
+
+            ['puntoDescripcion', 'puntoCosto', 'puntoObservaciones'].forEach(x => { document.getElementById(x).value = ''; });
+            document.getElementById('puntoCantidad').value = 1;
+            document.getElementById('puntoDescripcion').focus();
+            abrirModalEdicion(id);
+            cargarLista();
+        } catch (error) {
+            console.error('Error al agregar el punto:', error);
+            showAlert('Error de conexión al agregar el punto.', 'error');
+        }
+    }
+
+    async function eliminarPunto(idDetalle) {
+        const ok = await showConfirm('¿Eliminar este punto?', { type: 'danger', title: 'Eliminar punto' });
+        if (!ok) return;
+        try {
+            const res = await fetch(`/api/mantenimientos/detalle/${idDetalle}`, { method: 'DELETE' });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) {
+                abrirModalEdicion(document.getElementById('edit_id').value);
+                cargarLista();
+            }
+        } catch (error) {
+            console.error('Error al eliminar el punto:', error);
+            showAlert('Error de conexión.', 'error');
+        }
+    }
+
     // ───────────────────────── PAGO ─────────────────────────
     async function enviarPago(fechaPago) {
         const id = document.getElementById('edit_id').value;
@@ -710,6 +840,11 @@
         modalConcluir = new bootstrap.Modal(document.getElementById('modalConcluir'));
         await cargarCatalogos();
         cargarLista();
+
+        // Capturar varios puntos seguidos sin soltar el teclado.
+        document.getElementById('puntoDescripcion').addEventListener('keydown', ev => {
+            if (ev.key === 'Enter') { ev.preventDefault(); agregarPunto(); }
+        });
     });
 </script>
 

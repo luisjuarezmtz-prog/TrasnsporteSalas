@@ -113,6 +113,116 @@ async function valoresComunes(body) {
   ];
 }
 
+// --- COMPARATIVO DE SERVICIOS REPETIDOS ---
+// Responde a "¿por qué se le han hecho tantos servicios del mismo
+// tipo a esta unidad?": agrupa las órdenes concluidas por unidad y
+// concepto, y para cada grupo devuelve cuántas van, cuánto se ha
+// gastado y cada cuántos días en promedio se repite. Solo cuenta
+// CONCLUIDAS: una solicitud que nunca se autorizó no es un servicio
+// que haya pasado.
+router.get('/mantenimientos/comparativo', async (req, res) => {
+  const minimo = Math.max(parseInt(req.query.minimo, 10) || 2, 1);
+
+  const condiciones = ["m.ESTATUS = 'CONCLUIDA'"];
+  const params = [];
+  if (req.query.tipo && TIPOS.includes(req.query.tipo)) {
+    condiciones.push('m.TIPO = ?');
+    params.push(req.query.tipo);
+  }
+  if (req.query.fechaInicio && req.query.fechaFin) {
+    condiciones.push('m.FECHA_SOLICITUD BETWEEN ? AND ?');
+    params.push(req.query.fechaInicio, req.query.fechaFin);
+  }
+
+  try {
+    const [grupos] = await dbPromesa.query(
+      `SELECT m.UNIDAD_PLACAS, m.ID_TRAILER, m.TIPO, m.ID_TIPO, c.NOMBRE AS CONCEPTO,
+              COUNT(*) AS VECES,
+              SUM(COALESCE(m.MONTO_REAL, m.MONTO_ESTIMADO)) AS GASTO_TOTAL,
+              MIN(m.FECHA_SOLICITUD) AS PRIMERA,
+              MAX(m.FECHA_SOLICITUD) AS ULTIMA,
+              DATEDIFF(MAX(m.FECHA_SOLICITUD), MIN(m.FECHA_SOLICITUD)) AS DIAS_RANGO
+         FROM mantenimientos m
+         INNER JOIN c_tipos_mantenimiento c ON c.ID_TIPO = m.ID_TIPO
+        WHERE ${condiciones.join(' AND ')}
+        GROUP BY m.UNIDAD_PLACAS, m.ID_TRAILER, m.TIPO, m.ID_TIPO, c.NOMBRE
+       HAVING VECES >= ?
+        ORDER BY VECES DESC, GASTO_TOTAL DESC`,
+      [...params, minimo]
+    );
+
+    // Días promedio entre servicios: con N repeticiones hay N-1
+    // intervalos, no N. Es el dato que delata si algo se está
+    // rehaciendo demasiado seguido.
+    const data = grupos.map(g => ({
+      ...g,
+      DIAS_PROMEDIO: g.VECES > 1 ? Math.round(g.DIAS_RANGO / (g.VECES - 1)) : null,
+    }));
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Error al generar el comparativo de servicios:', err);
+    res.status(500).json({ success: false, message: 'Error al generar el comparativo.' });
+  }
+});
+
+// --- DETALLE DE UN GRUPO DEL COMPARATIVO ---
+// Las órdenes de esa unidad+concepto con los puntos que se hicieron en
+// cada una: es lo que permite ver si se repitió el mismo trabajo.
+router.get('/mantenimientos/comparativo/detalle', async (req, res) => {
+  const { unidad, idTipo } = req.query;
+  if (!unidad || !idTipo) {
+    return res.status(400).json({ success: false, message: 'Faltan unidad y concepto.' });
+  }
+
+  try {
+    const [ordenes] = await dbPromesa.query(
+      `SELECT m.ID_MANTENIMIENTO, m.FOLIO_OC, m.FECHA_SOLICITUD, m.FECHA_CONCLUSION,
+              m.ODOMETRO, m.MONTO_ESTIMADO, m.MONTO_REAL, m.DESCRIPCION,
+              p.NOMBRE_EMPRESARIAL AS PROVEEDOR
+         FROM mantenimientos m
+         LEFT JOIN proveedores p ON p.ID_PROVEEDOR = m.ID_PROVEEDOR
+        WHERE m.UNIDAD_PLACAS = ? AND m.ID_TIPO = ? AND m.ESTATUS = 'CONCLUIDA'
+        ORDER BY m.FECHA_SOLICITUD ASC`,
+      [unidad, idTipo]
+    );
+
+    const ids = ordenes.map(o => o.ID_MANTENIMIENTO);
+    const [puntos] = ids.length
+      ? await dbPromesa.query(
+          `SELECT ID_MANTENIMIENTO, DESCRIPCION, CANTIDAD, COSTO, OBSERVACIONES
+             FROM mantenimiento_detalle WHERE ID_MANTENIMIENTO IN (?)
+            ORDER BY ID_MANTENIMIENTO, ORDEN, ID_DETALLE`,
+          [ids]
+        )
+      : [[]];
+
+    // Un punto que aparece en varias órdenes del grupo es justo la
+    // señal que se está buscando: se marca para que salte a la vista.
+    const vecesPorPunto = new Map();
+    puntos.forEach(p => {
+      const clave = p.DESCRIPCION.trim().toLowerCase();
+      if (!vecesPorPunto.has(clave)) vecesPorPunto.set(clave, new Set());
+      vecesPorPunto.get(clave).add(p.ID_MANTENIMIENTO);
+    });
+
+    const data = ordenes.map(o => ({
+      ...o,
+      puntos: puntos
+        .filter(p => p.ID_MANTENIMIENTO === o.ID_MANTENIMIENTO)
+        .map(p => ({
+          ...p,
+          REPETIDO_EN: vecesPorPunto.get(p.DESCRIPCION.trim().toLowerCase()).size,
+        })),
+    }));
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Error al consultar el detalle del comparativo:', err);
+    res.status(500).json({ success: false, message: 'Error al consultar el detalle.' });
+  }
+});
+
 // --- ALTA ---
 router.post('/mantenimientos', async (req, res) => {
   const error = validar(req.body);
@@ -315,6 +425,7 @@ router.get('/mantenimientos', async (req, res) => {
               p.NOMBRE_EMPRESARIAL AS PROVEEDOR,
               t.NO_ECONOMICO,
               (SELECT COUNT(*) FROM mantenimiento_documentos d WHERE d.ID_MANTENIMIENTO = m.ID_MANTENIMIENTO) AS TOTAL_DOCUMENTOS,
+              (SELECT COUNT(*) FROM mantenimiento_detalle x WHERE x.ID_MANTENIMIENTO = m.ID_MANTENIMIENTO) AS TOTAL_PUNTOS,
               (SELECT COUNT(*) FROM mantenimiento_documentos d
                 WHERE d.ID_MANTENIMIENTO = m.ID_MANTENIMIENTO AND d.TIPO_DOCUMENTO = 'COMPROBANTE_PAGO') AS TIENE_COMPROBANTE_PAGO,
               (m.MONTO_REAL - m.MONTO_ESTIMADO) AS DIFERENCIA
@@ -351,7 +462,12 @@ router.get('/mantenimientos/:id', async (req, res) => {
       [req.params.id]
     );
 
-    res.json({ success: true, data: { ...registro, documentos } });
+    const [puntos] = await dbPromesa.query(
+      'SELECT ID_DETALLE, ORDEN, DESCRIPCION, CANTIDAD, COSTO, OBSERVACIONES FROM mantenimiento_detalle WHERE ID_MANTENIMIENTO = ? ORDER BY ORDEN, ID_DETALLE',
+      [req.params.id]
+    );
+
+    res.json({ success: true, data: { ...registro, documentos, puntos } });
   } catch (err) {
     console.error('Error al consultar el mantenimiento:', err);
     res.status(500).json({ success: false, message: 'Error al consultar el registro.' });
@@ -393,6 +509,52 @@ router.delete('/mantenimientos/documentos/:idDocumento', async (req, res) => {
   } catch (err) {
     console.error('Error al eliminar el comprobante:', err);
     res.status(500).json({ success: false, message: 'Error al eliminar el comprobante.' });
+  }
+});
+
+// --- PUNTOS REALIZADOS (lista, no checklist) ---
+router.post('/mantenimientos/:id/detalle', async (req, res) => {
+  const descripcion = String(req.body.descripcion || '').trim();
+  if (!descripcion) return res.status(400).json({ success: false, message: 'Captura el punto realizado.' });
+
+  try {
+    const [[fila]] = await dbPromesa.query(
+      'SELECT COALESCE(MAX(ORDEN), 0) + 1 AS siguiente FROM mantenimiento_detalle WHERE ID_MANTENIMIENTO = ?',
+      [req.params.id]
+    );
+
+    const [resultado] = await dbPromesa.query(
+      `INSERT INTO mantenimiento_detalle (ID_MANTENIMIENTO, ORDEN, DESCRIPCION, CANTIDAD, COSTO, OBSERVACIONES)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        req.params.id,
+        fila.siguiente,
+        descripcion,
+        req.body.cantidad || 1,
+        req.body.costo === '' || req.body.costo === undefined || req.body.costo === null ? null : req.body.costo,
+        String(req.body.observaciones || '').trim() || null,
+      ]
+    );
+    res.json({ success: true, message: 'Punto agregado.', id_detalle: resultado.insertId });
+  } catch (err) {
+    console.error('Error al agregar el punto:', err);
+    res.status(500).json({ success: false, message: 'Error al agregar el punto.' });
+  }
+});
+
+router.delete('/mantenimientos/detalle/:idDetalle', async (req, res) => {
+  try {
+    const [resultado] = await dbPromesa.query(
+      'DELETE FROM mantenimiento_detalle WHERE ID_DETALLE = ?',
+      [req.params.idDetalle]
+    );
+    if (resultado.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Punto no encontrado.' });
+    }
+    res.json({ success: true, message: 'Punto eliminado.' });
+  } catch (err) {
+    console.error('Error al eliminar el punto:', err);
+    res.status(500).json({ success: false, message: 'Error al eliminar el punto.' });
   }
 });
 

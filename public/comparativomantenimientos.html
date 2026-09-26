@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparativo de Servicios - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>🔍 Comparativo de Servicios</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+<p class="hint" style="margin-top:-14px;margin-bottom:20px;">
+    Unidades a las que se les ha hecho el mismo servicio más de una vez. Abre un renglón para
+    comparar qué se hizo en cada ocasión y detectar si el trabajo se está repitiendo.
+</p>
+
+<div class="panel">
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:end;margin-bottom:18px;">
+        <div class="field">
+            <label>Tipo</label>
+            <select id="filtroTipo">
+                <option value="">Todos</option>
+                <option value="MANTENIMIENTO">Mantenimiento</option>
+                <option value="GESTORIA">Gestoría</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Repeticiones mínimas</label>
+            <select id="filtroMinimo">
+                <option value="2" selected>2 o más</option>
+                <option value="3">3 o más</option>
+                <option value="4">4 o más</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Desde</label>
+            <input type="date" id="filtroFechaInicio">
+        </div>
+        <div class="field">
+            <label>Hasta</label>
+            <input type="date" id="filtroFechaFin">
+        </div>
+        <button class="primary" onclick="cargar()">🔍 Buscar</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Unidad</th>
+                <th>Concepto</th>
+                <th>Tipo</th>
+                <th class="text-center">Veces</th>
+                <th class="text-right">Gasto acumulado</th>
+                <th class="text-center">Cada</th>
+                <th>Primera</th>
+                <th>Última</th>
+                <th class="text-center">Comparar</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            <tr><td colspan="9" class="text-center hint">Cargando...</td></tr>
+        </tbody>
+    </table>
+    <p class="hint" id="contador" style="margin-top:10px;"></p>
+</div>
+
+<!-- Detalle del grupo: las órdenes lado a lado con sus puntos -->
+<div class="panel" id="panelDetalle" hidden>
+    <div class="panel-header">
+        <h2 id="tituloDetalle">Detalle</h2>
+        <button class="ghost" onclick="cerrarDetalle()">Cerrar</button>
+    </div>
+    <p class="hint" id="resumenDetalle" style="margin:0 0 14px;"></p>
+    <div id="contenedorDetalle"></div>
+</div>
+
+<script>
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+    const formatMoney = (v) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v || 0);
+
+    function aISO(valor) {
+        if (!valor) return '';
+        const d = new Date(valor);
+        if (isNaN(d.getTime())) return '';
+        d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+        return d.toISOString().split('T')[0];
+    }
+    function formatoFecha(valor) {
+        const iso = aISO(valor);
+        if (!iso) return '—';
+        const [a, m, d] = iso.split('-');
+        return `${d}/${m}/${a}`;
+    }
+
+    async function cargar() {
+        const tbody = document.getElementById('tablaCuerpo');
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center hint">Cargando...</td></tr>';
+        cerrarDetalle();
+
+        const params = new URLSearchParams();
+        params.set('minimo', document.getElementById('filtroMinimo').value);
+        const tipo = document.getElementById('filtroTipo').value;
+        const desde = document.getElementById('filtroFechaInicio').value;
+        const hasta = document.getElementById('filtroFechaFin').value;
+        if (tipo) params.set('tipo', tipo);
+        if (desde && hasta) { params.set('fechaInicio', desde); params.set('fechaFin', hasta); }
+
+        try {
+            const res = await fetch(`/api/mantenimientos/comparativo?${params.toString()}`);
+            const json = await res.json();
+
+            if (!json.success || json.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center hint">Ninguna unidad repite servicios con este filtro. 👌</td></tr>';
+                document.getElementById('contador').textContent = '';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            json.data.forEach(g => {
+                // Repetir un servicio cada pocas semanas es la señal que
+                // interesa: se resalta para que no se pierda en la lista.
+                const frecuente = g.DIAS_PROMEDIO !== null && g.DIAS_PROMEDIO <= 30;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-family:var(--mono);">${escapeHtml(g.UNIDAD_PLACAS || '—')}</td>
+                    <td>${escapeHtml(g.CONCEPTO)}</td>
+                    <td>${g.TIPO === 'GESTORIA' ? '📋 Gestoría' : '🔧 Mantto.'}</td>
+                    <td class="text-center"><span class="badge ${g.VECES >= 4 ? 'badge-bad' : 'badge-warn'}">${g.VECES}</span></td>
+                    <td class="text-right">${formatMoney(g.GASTO_TOTAL)}</td>
+                    <td class="text-center" style="${frecuente ? 'color:var(--bad);font-weight:700;' : ''}">
+                        ${g.DIAS_PROMEDIO !== null ? `${g.DIAS_PROMEDIO} día(s)` : '—'}
+                    </td>
+                    <td>${formatoFecha(g.PRIMERA)}</td>
+                    <td>${formatoFecha(g.ULTIMA)}</td>
+                    <td class="text-center">
+                        <button class="ghost" title="Comparar los servicios"
+                            onclick="verDetalle('${escapeHtml(g.UNIDAD_PLACAS)}', ${g.ID_TIPO}, '${escapeHtml(g.CONCEPTO)}')">🔎</button>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('contador').textContent =
+                `${json.data.length} combinación(es) de unidad + concepto con servicios repetidos`;
+        } catch (error) {
+            console.error('Error al cargar el comparativo:', error);
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+        }
+    }
+
+    function cerrarDetalle() {
+        document.getElementById('panelDetalle').hidden = true;
+    }
+
+    async function verDetalle(unidad, idTipo, concepto) {
+        const panel = document.getElementById('panelDetalle');
+        const cont = document.getElementById('contenedorDetalle');
+        document.getElementById('tituloDetalle').textContent = `${unidad} — ${concepto}`;
+        cont.innerHTML = '<p class="hint">Cargando...</p>';
+        panel.hidden = false;
+        panel.scrollIntoView({ behavior: 'smooth' });
+
+        try {
+            const params = new URLSearchParams({ unidad, idTipo });
+            const res = await fetch(`/api/mantenimientos/comparativo/detalle?${params.toString()}`);
+            const json = await res.json();
+            if (!json.success) return showAlert(json.message, 'error');
+
+            const ordenes = json.data;
+            const repetidos = new Set();
+            ordenes.forEach(o => o.puntos.forEach(p => { if (p.REPETIDO_EN > 1) repetidos.add(p.DESCRIPCION.trim().toLowerCase()); }));
+
+            document.getElementById('resumenDetalle').innerHTML = repetidos.size
+                ? `<b style="color:var(--bad);">${repetidos.size} punto(s) se repiten en más de un servicio</b> — van marcados en rojo abajo.`
+                : 'Ningún punto se repite entre servicios: cada vez se hizo un trabajo distinto.';
+
+            cont.innerHTML = ordenes.map(o => `
+                <div class="panel" style="margin-bottom:14px;padding:14px 16px;">
+                    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                        <div>
+                            <b style="font-family:var(--mono);">${escapeHtml(o.FOLIO_OC || 's/folio')}</b>
+                            <span class="hint"> · ${formatoFecha(o.FECHA_SOLICITUD)}${o.PROVEEDOR ? ' · ' + escapeHtml(o.PROVEEDOR) : ''}</span>
+                        </div>
+                        <div>
+                            <span class="hint">Odómetro:</span> ${o.ODOMETRO ? Number(o.ODOMETRO).toLocaleString('es-MX') : '—'}
+                            &nbsp;·&nbsp;
+                            <b>${formatMoney(o.MONTO_REAL ?? o.MONTO_ESTIMADO)}</b>
+                        </div>
+                    </div>
+                    ${o.DESCRIPCION ? `<p class="hint" style="margin:0 0 10px;">${escapeHtml(o.DESCRIPCION)}</p>` : ''}
+                    ${o.puntos.length === 0
+                        ? '<p class="hint" style="margin:0;color:var(--amber);">Esta orden no tiene puntos capturados, así que no se puede comparar qué se hizo.</p>'
+                        : `<table>
+                            <thead><tr><th>Punto realizado</th><th class="text-right">Cant.</th><th class="text-right">Costo</th><th>Observaciones</th></tr></thead>
+                            <tbody>
+                                ${o.puntos.map(p => `
+                                    <tr${p.REPETIDO_EN > 1 ? ' style="background:rgba(192,57,43,.08);"' : ''}>
+                                        <td>${escapeHtml(p.DESCRIPCION)}${p.REPETIDO_EN > 1
+                                            ? ` <span class="badge badge-bad">se repite en ${p.REPETIDO_EN}</span>` : ''}</td>
+                                        <td class="text-right">${Number(p.CANTIDAD)}</td>
+                                        <td class="text-right">${p.COSTO !== null ? formatMoney(p.COSTO) : '—'}</td>
+                                        <td>${escapeHtml(p.OBSERVACIONES || '')}</td>
+                                    </tr>`).join('')}
+                            </tbody>
+                           </table>`}
+                </div>`).join('');
+        } catch (error) {
+            console.error('Error al cargar el detalle:', error);
+            cont.innerHTML = '<p class="hint" style="color:var(--bad);">Error al conectar con el servidor.</p>';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        ['filtroTipo', 'filtroMinimo'].forEach(id =>
+            document.getElementById(id).addEventListener('change', cargar));
+        cargar();
+    });
+</script>
+
+</body>
+</html>
