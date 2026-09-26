@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mantenimientos y Gestorías - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>🔩 Mantenimientos y Gestorías</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<div class="grid grid-4" style="margin-bottom:18px;">
+    <div class="stat-card"><div class="stat-label">Por autorizar</div><div id="kpiSolicitadas" class="stat-value amber">—</div></div>
+    <div class="stat-card"><div class="stat-label">En proceso</div><div id="kpiProceso" class="stat-value">—</div></div>
+    <div class="stat-card"><div class="stat-label">Autorizado (estimado)</div><div id="kpiEstimado" class="stat-value">—</div></div>
+    <div class="stat-card"><div class="stat-label">Gasto real concluido</div><div id="kpiReal" class="stat-value bad">—</div></div>
+</div>
+
+<div class="panel">
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr auto auto;gap:12px;align-items:end;margin-bottom:18px;">
+        <div class="field">
+            <label>Tipo</label>
+            <select id="filtroTipo">
+                <option value="">Todos</option>
+                <option value="MANTENIMIENTO">Mantenimiento</option>
+                <option value="GESTORIA">Gestoría</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Estatus</label>
+            <select id="filtroEstatus">
+                <option value="">Todos</option>
+                <option value="SOLICITADA">Solicitada</option>
+                <option value="AUTORIZADA">Autorizada</option>
+                <option value="EN_PROCESO">En proceso</option>
+                <option value="CONCLUIDA">Concluida</option>
+                <option value="CANCELADA">Cancelada</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Desde</label>
+            <input type="date" id="filtroFechaInicio">
+        </div>
+        <div class="field">
+            <label>Hasta</label>
+            <input type="date" id="filtroFechaFin">
+        </div>
+        <button class="primary" onclick="cargarLista()">🔍 Buscar</button>
+        <button class="primary" onclick="abrirModalAlta()">➕ Nueva orden</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Folio OC</th>
+                <th>Tipo</th>
+                <th>Concepto</th>
+                <th>Unidad</th>
+                <th>Proveedor</th>
+                <th>Solicitud</th>
+                <th class="text-right">Estimado</th>
+                <th class="text-right">Real</th>
+                <th>Estatus</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            <tr><td colspan="10" class="text-center hint">Cargando...</td></tr>
+        </tbody>
+    </table>
+    <p class="hint" id="contador" style="margin-top:10px;"></p>
+</div>
+
+<!-- MODAL ALTA / CAMBIO -->
+<div class="modal fade" id="modalOrden" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloModal">➕ Nueva orden</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit_id">
+                <div id="bandaEstatus" class="hint" style="margin:0 0 14px;"></div>
+
+                <h6 class="seccion">Qué y para qué unidad</h6>
+                <div class="grid grid-2" style="margin-bottom:10px;">
+                    <div class="field">
+                        <label>Tipo *</label>
+                        <select id="tipo" onchange="filtrarConceptos()">
+                            <option value="MANTENIMIENTO">Mantenimiento</option>
+                            <option value="GESTORIA">Gestoría</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Concepto *</label>
+                        <select id="idTipo"></select>
+                    </div>
+                </div>
+
+                <div class="grid grid-3" style="margin-bottom:10px;">
+                    <div class="field">
+                        <label>Unidad *</label>
+                        <select id="tipoUnidad" onchange="cambiarTipoUnidad()">
+                            <option value="TRAILER">Tráiler</option>
+                            <option value="CAJA">Caja</option>
+                        </select>
+                    </div>
+                    <div class="field" id="campoTrailer">
+                        <label>Tráiler *</label>
+                        <select id="idTrailer"><option value="">-- Seleccione --</option></select>
+                    </div>
+                    <div class="field" id="campoPlacas" hidden>
+                        <label>Placas de la caja *</label>
+                        <input type="text" id="unidadPlacas" style="text-transform:uppercase;">
+                    </div>
+                </div>
+
+                <div class="field" style="margin-bottom:10px;">
+                    <label>Proveedor (taller / gestor) *</label>
+                    <select id="idProveedor"><option value="">-- Seleccione --</option></select>
+                </div>
+
+                <div class="field" style="margin-bottom:14px;">
+                    <label>Descripción del trabajo o trámite</label>
+                    <textarea id="descripcion" rows="3"></textarea>
+                </div>
+
+                <h6 class="seccion">Fechas y costo</h6>
+                <div class="grid grid-4" style="margin-bottom:10px;">
+                    <div class="field">
+                        <label>Fecha de solicitud *</label>
+                        <input type="date" id="fechaSolicitud">
+                    </div>
+                    <div class="field">
+                        <label>Fecha programada</label>
+                        <input type="date" id="fechaProgramada">
+                    </div>
+                    <div class="field">
+                        <label>Odómetro (km)</label>
+                        <input type="number" id="odometro" min="0" step="1">
+                    </div>
+                    <div class="field">
+                        <label>Monto estimado *</label>
+                        <input type="number" id="montoEstimado" min="0" step="0.01" value="0">
+                    </div>
+                </div>
+
+                <div class="field" id="campoVencimiento" style="margin-bottom:14px;" hidden>
+                    <label>Nueva fecha de vencimiento del documento</label>
+                    <input type="date" id="fechaVencimientoNueva">
+                    <p class="hint" style="margin:6px 0 0;">Para trámites que renuevan un documento (placas, verificación, tarjeta). Alimenta el control de vencimientos.</p>
+                </div>
+
+                <div class="field" style="margin-bottom:14px;">
+                    <label>Observaciones</label>
+                    <textarea id="observaciones" rows="2"></textarea>
+                </div>
+
+                <!-- Solo aplica una vez que la orden existe -->
+                <div id="bloquePosterior" hidden>
+                    <h6 class="seccion">Comprobantes</h6>
+                    <div class="grid" style="grid-template-columns:1fr auto;gap:12px;align-items:end;margin-bottom:12px;">
+                        <div class="field">
+                            <label>Factura o documento (PDF, JPG o PNG)</label>
+                            <input type="file" id="inputDocumento" accept="application/pdf,image/png,image/jpeg">
+                        </div>
+                        <button type="button" class="ghost" onclick="subirDocumento()">➕ Agregar</button>
+                    </div>
+                    <table>
+                        <thead><tr><th>Archivo</th><th>Fecha</th><th class="text-center">Acciones</th></tr></thead>
+                        <tbody id="tablaDocumentos"><tr><td colspan="3" class="text-center hint">Sin comprobantes.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="flex-wrap:wrap;gap:8px;">
+                <div id="accionesFlujo" style="display:flex;gap:8px;flex-wrap:wrap;margin-right:auto;"></div>
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" id="btnGuardar" onclick="guardarOrden()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CONCLUIR -->
+<div class="modal fade" id="modalConcluir" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">✅ Concluir orden</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="hint" style="margin:0 0 12px;">Monto autorizado: <b id="concluirEstimado">$0.00</b></p>
+                <div class="field" style="margin-bottom:10px;">
+                    <label>Monto real *</label>
+                    <input type="number" id="montoReal" min="0" step="0.01">
+                </div>
+                <div class="field">
+                    <label>Fecha de conclusión</label>
+                    <input type="date" id="fechaConclusion">
+                </div>
+                <p class="hint" id="avisoDiferencia" style="margin:10px 0 0;"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="primary" onclick="confirmarConclusion()">Concluir</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .seccion {
+        font-family: var(--mono); font-size: 12px; text-transform: uppercase;
+        color: var(--amber); border-bottom: 1px solid var(--line);
+        padding-bottom: 6px; margin: 22px 0 14px;
+    }
+    .seccion:first-of-type { margin-top: 0; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+    const formatMoney = (v) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v || 0);
+
+    function aValorDeInput(valor) {
+        if (!valor) return '';
+        const d = new Date(valor);
+        if (isNaN(d.getTime())) return '';
+        d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+        return d.toISOString().split('T')[0];
+    }
+    function formatoFecha(valor) {
+        const iso = aValorDeInput(valor);
+        if (!iso) return '—';
+        const [a, m, d] = iso.split('-');
+        return `${d}/${m}/${a}`;
+    }
+
+    const BADGE_ESTATUS = {
+        SOLICITADA: ['badge-warn', 'Solicitada'],
+        AUTORIZADA: ['badge-info', 'Autorizada'],
+        EN_PROCESO: ['badge-info', 'En proceso'],
+        CONCLUIDA:  ['badge-ok', 'Concluida'],
+        CANCELADA:  ['badge-muted', 'Cancelada'],
+    };
+    // Mismo cuadro de transiciones que valida el backend.
+    const TRANSICIONES = {
+        SOLICITADA: ['AUTORIZADA', 'CANCELADA'],
+        AUTORIZADA: ['EN_PROCESO', 'CONCLUIDA', 'CANCELADA'],
+        EN_PROCESO: ['CONCLUIDA', 'CANCELADA'],
+        CONCLUIDA: [],
+        CANCELADA: [],
+    };
+    const ETIQUETA_ACCION = {
+        AUTORIZADA: '✅ Autorizar (genera OC)',
+        EN_PROCESO: '🔧 Marcar en proceso',
+        CONCLUIDA: '🏁 Concluir',
+        CANCELADA: '🚫 Cancelar',
+    };
+
+    let modalOrden, modalConcluir;
+    let catalogos = { tipos: [], proveedores: [], trailers: [] };
+    let ordenActual = null;
+
+    // ───────────────────────── CATÁLOGOS ─────────────────────────
+    async function cargarCatalogos() {
+        const res = await fetch('/api/mantenimientos/catalogos');
+        const json = await res.json();
+        if (!json.success) return;
+        catalogos = json;
+
+        const selProv = document.getElementById('idProveedor');
+        json.proveedores.forEach(p => selProv.appendChild(new Option(p.NOMBRE_EMPRESARIAL || p.NOMBRE_PROVEEDOR, p.ID_PROVEEDOR)));
+
+        const selTrailer = document.getElementById('idTrailer');
+        json.trailers.forEach(t => selTrailer.appendChild(new Option(t.NAME, t.ID_TRAILER)));
+
+        filtrarConceptos();
+    }
+
+    // El catálogo de conceptos depende del tipo: no tiene sentido
+    // ofrecer "Frenos" en una gestoría ni "Placas" en un mantenimiento.
+    function filtrarConceptos() {
+        const tipo = document.getElementById('tipo').value;
+        const sel = document.getElementById('idTipo');
+        sel.innerHTML = '';
+        catalogos.tipos.filter(t => t.TIPO === tipo).forEach(t => sel.appendChild(new Option(t.NOMBRE, t.ID_TIPO)));
+        document.getElementById('campoVencimiento').hidden = tipo !== 'GESTORIA';
+    }
+
+    function cambiarTipoUnidad() {
+        const esTrailer = document.getElementById('tipoUnidad').value === 'TRAILER';
+        document.getElementById('campoTrailer').hidden = !esTrailer;
+        document.getElementById('campoPlacas').hidden = esTrailer;
+    }
+
+    // ───────────────────────── LISTADO ─────────────────────────
+    async function cargarLista() {
+        const tbody = document.getElementById('tablaCuerpo');
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center hint">Cargando...</td></tr>';
+
+        const params = new URLSearchParams();
+        const tipo = document.getElementById('filtroTipo').value;
+        const estatus = document.getElementById('filtroEstatus').value;
+        const desde = document.getElementById('filtroFechaInicio').value;
+        const hasta = document.getElementById('filtroFechaFin').value;
+        if (tipo) params.set('tipo', tipo);
+        if (estatus) params.set('estatus', estatus);
+        if (desde && hasta) { params.set('fechaInicio', desde); params.set('fechaFin', hasta); }
+
+        try {
+            const res = await fetch(`/api/mantenimientos?${params.toString()}`);
+            const json = await res.json();
+
+            if (!json.success || json.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center hint">No hay órdenes registradas.</td></tr>';
+                document.getElementById('contador').textContent = '';
+                pintarKpis([]);
+                return;
+            }
+
+            tbody.innerHTML = '';
+            json.data.forEach(m => {
+                const [clase, texto] = BADGE_ESTATUS[m.ESTATUS] || ['badge-muted', m.ESTATUS];
+                const diferencia = m.MONTO_REAL !== null ? Number(m.DIFERENCIA) : null;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-family:var(--mono);font-weight:700;">${escapeHtml(m.FOLIO_OC || '—')}</td>
+                    <td>${m.TIPO === 'GESTORIA' ? '📋 Gestoría' : '🔧 Mantto.'}</td>
+                    <td>${escapeHtml(m.CONCEPTO)}</td>
+                    <td style="font-family:var(--mono);">${escapeHtml(m.UNIDAD_PLACAS || '—')}${m.NO_ECONOMICO ? `<span class="hint" style="display:block;">${escapeHtml(m.NO_ECONOMICO)}</span>` : ''}</td>
+                    <td>${escapeHtml(m.PROVEEDOR || '—')}</td>
+                    <td>${formatoFecha(m.FECHA_SOLICITUD)}</td>
+                    <td class="text-right">${formatMoney(m.MONTO_ESTIMADO)}</td>
+                    <td class="text-right">${m.MONTO_REAL !== null
+                        ? `${formatMoney(m.MONTO_REAL)}${diferencia ? `<span class="hint" style="display:block;color:${diferencia > 0 ? 'var(--bad)' : 'var(--ok)'};">${diferencia > 0 ? '+' : ''}${formatMoney(diferencia)}</span>` : ''}`
+                        : '—'}</td>
+                    <td><span class="badge ${clase}">${texto}</span></td>
+                    <td class="text-center"><button class="ghost" title="Ver / editar" onclick="abrirModalEdicion(${m.ID_MANTENIMIENTO})">✏️</button></td>`;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('contador').textContent = `Mostrando ${json.data.length} orden(es)`;
+            pintarKpis(json.data);
+        } catch (error) {
+            console.error('Error al cargar la lista:', error);
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+        }
+    }
+
+    function pintarKpis(datos) {
+        const solicitadas = datos.filter(m => m.ESTATUS === 'SOLICITADA').length;
+        const proceso = datos.filter(m => m.ESTATUS === 'EN_PROCESO').length;
+        // El estimado cuenta solo lo que ya pasó por autorización.
+        const estimado = datos
+            .filter(m => ['AUTORIZADA', 'EN_PROCESO', 'CONCLUIDA'].includes(m.ESTATUS))
+            .reduce((a, m) => a + Number(m.MONTO_ESTIMADO || 0), 0);
+        const real = datos
+            .filter(m => m.ESTATUS === 'CONCLUIDA')
+            .reduce((a, m) => a + Number(m.MONTO_REAL || 0), 0);
+
+        document.getElementById('kpiSolicitadas').textContent = solicitadas;
+        document.getElementById('kpiProceso').textContent = proceso;
+        document.getElementById('kpiEstimado').textContent = formatMoney(estimado);
+        document.getElementById('kpiReal').textContent = formatMoney(real);
+    }
+
+    // ───────────────────────── ALTA / CAMBIO ─────────────────────────
+    function limpiarFormulario() {
+        ordenActual = null;
+        document.getElementById('edit_id').value = '';
+        ['unidadPlacas', 'descripcion', 'fechaProgramada', 'odometro', 'observaciones', 'fechaVencimientoNueva']
+            .forEach(id => { document.getElementById(id).value = ''; });
+        document.getElementById('tipo').value = 'MANTENIMIENTO';
+        document.getElementById('tipoUnidad').value = 'TRAILER';
+        document.getElementById('idTrailer').value = '';
+        document.getElementById('idProveedor').value = '';
+        document.getElementById('montoEstimado').value = 0;
+        document.getElementById('fechaSolicitud').value = new Date().toISOString().split('T')[0];
+        document.getElementById('bandaEstatus').innerHTML = '';
+        document.getElementById('accionesFlujo').innerHTML = '';
+        document.getElementById('bloquePosterior').hidden = true;
+        document.getElementById('btnGuardar').hidden = false;
+        filtrarConceptos();
+        cambiarTipoUnidad();
+        habilitarCampos(true);
+    }
+
+    // Una vez autorizada, el alcance y el monto ya no se tocan: para eso
+    // se cancela y se levanta otra orden.
+    function habilitarCampos(habilitado) {
+        ['tipo', 'idTipo', 'tipoUnidad', 'idTrailer', 'unidadPlacas', 'idProveedor', 'descripcion',
+         'fechaSolicitud', 'fechaProgramada', 'odometro', 'montoEstimado', 'fechaVencimientoNueva', 'observaciones']
+            .forEach(id => { document.getElementById(id).disabled = !habilitado; });
+    }
+
+    function abrirModalAlta() {
+        limpiarFormulario();
+        document.getElementById('tituloModal').textContent = '➕ Nueva orden';
+        modalOrden.show();
+    }
+
+    async function abrirModalEdicion(id) {
+        limpiarFormulario();
+        try {
+            const res = await fetch(`/api/mantenimientos/${id}`);
+            const json = await res.json();
+            if (!json.success) return showAlert(json.message, 'error');
+
+            const m = json.data;
+            ordenActual = m;
+            document.getElementById('edit_id').value = id;
+            document.getElementById('tituloModal').textContent = m.FOLIO_OC ? `Orden ${m.FOLIO_OC}` : '✏️ Solicitud';
+
+            document.getElementById('tipo').value = m.TIPO;
+            filtrarConceptos();
+            document.getElementById('idTipo').value = m.ID_TIPO;
+            document.getElementById('tipoUnidad').value = m.TIPO_UNIDAD;
+            cambiarTipoUnidad();
+            document.getElementById('idTrailer').value = m.ID_TRAILER || '';
+            document.getElementById('unidadPlacas').value = m.UNIDAD_PLACAS || '';
+            document.getElementById('idProveedor').value = m.ID_PROVEEDOR;
+            document.getElementById('descripcion').value = m.DESCRIPCION || '';
+            document.getElementById('fechaSolicitud').value = aValorDeInput(m.FECHA_SOLICITUD);
+            document.getElementById('fechaProgramada').value = aValorDeInput(m.FECHA_PROGRAMADA);
+            document.getElementById('odometro').value = m.ODOMETRO || '';
+            document.getElementById('montoEstimado').value = m.MONTO_ESTIMADO;
+            document.getElementById('fechaVencimientoNueva').value = aValorDeInput(m.FECHA_VENCIMIENTO_NUEVA);
+            document.getElementById('observaciones').value = m.OBSERVACIONES || '';
+
+            const [clase, texto] = BADGE_ESTATUS[m.ESTATUS] || ['badge-muted', m.ESTATUS];
+            document.getElementById('bandaEstatus').innerHTML = `
+                <span class="badge ${clase}">${texto}</span>
+                ${m.FOLIO_OC ? ` · Orden de compra <b style="font-family:var(--mono);">${escapeHtml(m.FOLIO_OC)}</b>` : ''}
+                ${m.AUTORIZADO_POR ? ` · autorizó ${escapeHtml(m.AUTORIZADO_POR)} el ${formatoFecha(m.FECHA_AUTORIZACION)}` : ''}
+                ${m.MONTO_REAL !== null ? ` · costo real ${formatMoney(m.MONTO_REAL)}` : ''}`;
+
+            const editable = m.ESTATUS === 'SOLICITADA';
+            habilitarCampos(editable);
+            document.getElementById('btnGuardar').hidden = !editable;
+
+            pintarAccionesFlujo(m.ESTATUS);
+            document.getElementById('bloquePosterior').hidden = false;
+            pintarDocumentos(m.documentos || []);
+
+            modalOrden.show();
+        } catch (error) {
+            console.error('Error al cargar la orden:', error);
+            showAlert('Error de conexión al cargar la orden.', 'error');
+        }
+    }
+
+    function pintarAccionesFlujo(estatus) {
+        const cont = document.getElementById('accionesFlujo');
+        cont.innerHTML = '';
+        (TRANSICIONES[estatus] || []).forEach(destino => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = destino === 'CANCELADA' ? 'ghost' : 'primary';
+            btn.textContent = ETIQUETA_ACCION[destino];
+            btn.onclick = () => cambiarEstatus(destino);
+            cont.appendChild(btn);
+        });
+    }
+
+    function datosFormulario() {
+        return {
+            tipo: document.getElementById('tipo').value,
+            idTipo: document.getElementById('idTipo').value,
+            tipoUnidad: document.getElementById('tipoUnidad').value,
+            idTrailer: document.getElementById('idTrailer').value || null,
+            unidadPlacas: document.getElementById('unidadPlacas').value,
+            idProveedor: document.getElementById('idProveedor').value || null,
+            descripcion: document.getElementById('descripcion').value,
+            fechaSolicitud: document.getElementById('fechaSolicitud').value,
+            fechaProgramada: document.getElementById('fechaProgramada').value || null,
+            odometro: document.getElementById('odometro').value || null,
+            montoEstimado: document.getElementById('montoEstimado').value || 0,
+            fechaVencimientoNueva: document.getElementById('fechaVencimientoNueva').value || null,
+            observaciones: document.getElementById('observaciones').value,
+            usuario: localStorage.getItem('username') || 'Sistema',
+        };
+    }
+
+    async function guardarOrden() {
+        const id = document.getElementById('edit_id').value;
+        try {
+            const res = await fetch(id ? `/api/mantenimientos/${id}` : '/api/mantenimientos', {
+                method: id ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(datosFormulario()),
+            });
+            const json = await res.json();
+            if (!json.success) return showAlert(json.message, 'error');
+
+            showAlert(json.message, 'success');
+            cargarLista();
+            abrirModalEdicion(id || json.id_mantenimiento);
+        } catch (error) {
+            console.error('Error al guardar la orden:', error);
+            showAlert('Error de conexión al guardar.', 'error');
+        }
+    }
+
+    async function cambiarEstatus(destino) {
+        const id = document.getElementById('edit_id').value;
+
+        if (destino === 'CONCLUIDA') {
+            document.getElementById('concluirEstimado').textContent = formatMoney(ordenActual.MONTO_ESTIMADO);
+            document.getElementById('montoReal').value = ordenActual.MONTO_ESTIMADO;
+            document.getElementById('fechaConclusion').value = new Date().toISOString().split('T')[0];
+            document.getElementById('avisoDiferencia').textContent = '';
+            modalConcluir.show();
+            return;
+        }
+
+        const confirmaciones = {
+            AUTORIZADA: '¿Autorizar esta orden? Se generará el folio de orden de compra y el alcance ya no será editable.',
+            EN_PROCESO: '¿Marcar esta orden como en proceso?',
+            CANCELADA: '¿Cancelar esta orden? No se podrá reactivar.',
+        };
+        const ok = await showConfirm(confirmaciones[destino], {
+            type: destino === 'CANCELADA' ? 'danger' : 'success',
+            title: ETIQUETA_ACCION[destino].replace(/^[^\s]+\s/, ''),
+        });
+        if (!ok) return;
+
+        await enviarEstatus(id, { estatus: destino });
+    }
+
+    async function confirmarConclusion() {
+        const id = document.getElementById('edit_id').value;
+        const montoReal = document.getElementById('montoReal').value;
+        if (montoReal === '') return showAlert('Captura el monto real.', 'info');
+
+        modalConcluir.hide();
+        await enviarEstatus(id, {
+            estatus: 'CONCLUIDA',
+            montoReal,
+            fechaConclusion: document.getElementById('fechaConclusion').value,
+        });
+    }
+
+    async function enviarEstatus(id, cuerpo) {
+        try {
+            const res = await fetch(`/api/mantenimientos/${id}/estatus`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...cuerpo, usuario: localStorage.getItem('username') || 'Sistema' }),
+            });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) {
+                cargarLista();
+                abrirModalEdicion(id);
+            }
+        } catch (error) {
+            console.error('Error al cambiar el estatus:', error);
+            showAlert('Error de conexión.', 'error');
+        }
+    }
+
+    // ───────────────────────── COMPROBANTES ─────────────────────────
+    function pintarDocumentos(documentos) {
+        const tbody = document.getElementById('tablaDocumentos');
+        if (documentos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center hint">Sin comprobantes.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = '';
+        documentos.forEach(d => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><a href="${escapeHtml(d.FILE_PATH)}" target="_blank" rel="noopener">${escapeHtml(d.FILE_NAME)}</a></td>
+                <td>${formatoFecha(d.UPLOAD_DATE)}</td>
+                <td class="text-center"><button class="ghost" title="Eliminar" onclick="eliminarDocumento(${d.ID_DOCUMENTO})">🗑️</button></td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function subirDocumento() {
+        const id = document.getElementById('edit_id').value;
+        const input = document.getElementById('inputDocumento');
+        if (!input.files[0]) return showAlert('Selecciona un archivo.', 'info');
+
+        const formData = new FormData();
+        formData.append('documento', input.files[0]);
+
+        try {
+            const res = await fetch(`/api/mantenimientos/${id}/documentos`, { method: 'POST', body: formData });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) { input.value = ''; abrirModalEdicion(id); }
+        } catch (error) {
+            console.error('Error al subir el comprobante:', error);
+            showAlert('Error de conexión al subir el comprobante.', 'error');
+        }
+    }
+
+    async function eliminarDocumento(idDocumento) {
+        const ok = await showConfirm('¿Eliminar este comprobante?', { type: 'danger', title: 'Eliminar comprobante' });
+        if (!ok) return;
+        try {
+            const res = await fetch(`/api/mantenimientos/documentos/${idDocumento}`, { method: 'DELETE' });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) abrirModalEdicion(document.getElementById('edit_id').value);
+        } catch (error) {
+            console.error('Error al eliminar el comprobante:', error);
+            showAlert('Error de conexión.', 'error');
+        }
+    }
+
+    document.getElementById('montoReal')?.addEventListener('input', () => {
+        const diferencia = Number(document.getElementById('montoReal').value || 0) - Number(ordenActual?.MONTO_ESTIMADO || 0);
+        const aviso = document.getElementById('avisoDiferencia');
+        if (!diferencia) { aviso.textContent = ''; return; }
+        aviso.innerHTML = diferencia > 0
+            ? `<span style="color:var(--bad);">Se pasó ${formatMoney(diferencia)} del monto autorizado.</span>`
+            : `<span style="color:var(--ok);">Quedó ${formatMoney(Math.abs(diferencia))} por debajo de lo autorizado.</span>`;
+    });
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        modalOrden = new bootstrap.Modal(document.getElementById('modalOrden'));
+        modalConcluir = new bootstrap.Modal(document.getElementById('modalConcluir'));
+        await cargarCatalogos();
+        cargarLista();
+    });
+</script>
+
+</body>
+</html>
