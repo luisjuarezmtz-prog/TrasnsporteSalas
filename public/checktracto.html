@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script src="js/theme.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check de Unidad (Tracto Camión)</title>
+<link rel="stylesheet" href="style.css">
+<script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+  <h1>🚛 Check de Unidad — Tracto Camión</h1>
+  <div>
+    <span class="tag">FORM-CTC-01</span>
+    <a href="dashboard.html" class="link-plain tag">← Volver al menú</a>
+  </div>
+</div>
+
+<!-- ── Buscar / cargar check guardado ─────────────────────── -->
+<div class="panel">
+  <h2>Buscar / cargar check guardado</h2>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr auto auto;gap:12px;align-items:end;">
+    <div class="field">
+      <label>Desde</label>
+      <input type="date" id="filtroFechaInicio">
+    </div>
+    <div class="field">
+      <label>Hasta</label>
+      <input type="date" id="filtroFechaFin">
+    </div>
+    <div class="field">
+      <label>Unidad / Placas</label>
+      <input type="text" id="filtroUnidad" placeholder="Ej. 89BP1K">
+    </div>
+    <button class="primary" type="button" id="btnBuscar">🔍 Buscar</button>
+    <button class="ghost" type="button" id="btnNuevo">➕ Nuevo check</button>
+  </div>
+
+  <table style="margin-top:14px;">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Unidad / Placas</th>
+        <th>Operador</th>
+        <th>Origen / Destino</th>
+        <th>Estado general</th>
+        <th class="text-center">Daños</th>
+        <th class="text-center">Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="tablaChecks">
+      <tr><td colspan="7" class="text-center hint">Usa los filtros y da clic en Buscar.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ── Datos generales ─────────────────────────────────────── -->
+<div class="panel">
+  <h2>Datos generales</h2>
+  <input type="hidden" id="editId">
+  <div class="grid grid-4">
+    <div class="field">
+      <label>Fecha *</label>
+      <input type="date" id="fecha" required>
+    </div>
+    <div class="field">
+      <label>Unidad / Placas *</label>
+      <select id="idTrailer">
+        <option value="">— Capturar manualmente —</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Placas (si no está en el catálogo)</label>
+      <input type="text" id="unidadPlacas" style="text-transform:uppercase;">
+    </div>
+    <div class="field">
+      <label>Operador</label>
+      <input type="text" id="operador">
+    </div>
+  </div>
+  <div class="field" style="margin-top:12px;">
+    <label>Origen / Destino</label>
+    <input type="text" id="origenDestino" placeholder="Ej. Celaya → Querétaro">
+  </div>
+</div>
+
+<!-- ── Diagramas ───────────────────────────────────────────── -->
+<div class="panel">
+  <h2>Diagramas del tracto — clic sobre la imagen para marcar un daño</h2>
+  <p class="hint">Selecciona el tipo de daño y describe lo observado. Cada marca queda georreferenciada sobre el dibujo.</p>
+  <div class="views" id="viewsContainer">
+
+    <div class="view-card">
+      <h3>Vista lateral izquierda</h3>
+      <div class="view-wrap" data-vista="LATERAL_IZQUIERDA">
+        <svg viewBox="0 0 620 240" xmlns="http://www.w3.org/2000/svg">
+          <!-- cabina -->
+          <path d="M40 180 L40 90 Q40 60 75 58 L150 52 L165 95 L165 180 Z" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <rect x="62" y="72" width="60" height="34" fill="none" stroke="#3a444f"/>
+          <!-- dormitorio / cofre -->
+          <rect x="165" y="60" width="130" height="120" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <!-- chasis -->
+          <rect x="165" y="150" width="380" height="30" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <!-- tanque diesel -->
+          <rect x="310" y="120" width="80" height="34" rx="16" fill="none" stroke="#3a444f"/>
+          <!-- quinta rueda -->
+          <rect x="430" y="132" width="70" height="18" fill="none" stroke="#3a444f"/>
+          <!-- llantas -->
+          <circle cx="110" cy="196" r="26" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="440" cy="196" r="26" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="505" cy="196" r="26" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <!-- estribo -->
+          <line x1="150" y1="168" x2="175" y2="168" stroke="#3a444f" stroke-width="3"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="view-card">
+      <h3>Vista lateral derecha</h3>
+      <div class="view-wrap" data-vista="LATERAL_DERECHA">
+        <svg viewBox="0 0 620 240" xmlns="http://www.w3.org/2000/svg">
+          <path d="M580 180 L580 90 Q580 60 545 58 L470 52 L455 95 L455 180 Z" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <rect x="498" y="72" width="60" height="34" fill="none" stroke="#3a444f"/>
+          <rect x="325" y="60" width="130" height="120" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <rect x="75" y="150" width="380" height="30" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <rect x="230" y="120" width="80" height="34" rx="16" fill="none" stroke="#3a444f"/>
+          <rect x="120" y="132" width="70" height="18" fill="none" stroke="#3a444f"/>
+          <circle cx="510" cy="196" r="26" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="180" cy="196" r="26" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="115" cy="196" r="26" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <line x1="445" y1="168" x2="470" y2="168" stroke="#3a444f" stroke-width="3"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="view-card">
+      <h3>Vista frontal</h3>
+      <div class="view-wrap" data-vista="FRONTAL">
+        <svg viewBox="0 0 300 240" xmlns="http://www.w3.org/2000/svg">
+          <path d="M50 200 L50 70 Q50 35 95 35 L205 35 Q250 35 250 70 L250 200 Z" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <!-- parabrisas -->
+          <rect x="70" y="52" width="160" height="48" fill="none" stroke="#3a444f"/>
+          <!-- parrilla -->
+          <rect x="90" y="112" width="120" height="46" fill="none" stroke="#3a444f"/>
+          <g stroke="#3a444f" stroke-width="1">
+            <line x1="90" y1="124" x2="210" y2="124"/>
+            <line x1="90" y1="136" x2="210" y2="136"/>
+            <line x1="90" y1="148" x2="210" y2="148"/>
+          </g>
+          <!-- faros -->
+          <rect x="58" y="120" width="26" height="20" fill="none" stroke="#3a444f"/>
+          <rect x="216" y="120" width="26" height="20" fill="none" stroke="#3a444f"/>
+          <!-- defensa -->
+          <rect x="50" y="170" width="200" height="22" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <!-- espejos -->
+          <rect x="28" y="62" width="14" height="40" fill="none" stroke="#3a444f"/>
+          <rect x="258" y="62" width="14" height="40" fill="none" stroke="#3a444f"/>
+          <!-- llantas -->
+          <circle cx="78" cy="212" r="18" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="222" cy="212" r="18" fill="none" stroke="#5b6776" stroke-width="3"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="view-card">
+      <h3>Vista trasera</h3>
+      <div class="view-wrap" data-vista="TRASERA">
+        <svg viewBox="0 0 300 240" xmlns="http://www.w3.org/2000/svg">
+          <!-- parte trasera de cabina -->
+          <rect x="60" y="30" width="180" height="110" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <!-- deflectores -->
+          <path d="M60 30 L45 60 L45 120" fill="none" stroke="#3a444f"/>
+          <path d="M240 30 L255 60 L255 120" fill="none" stroke="#3a444f"/>
+          <!-- chasis / quinta rueda -->
+          <rect x="80" y="140" width="140" height="26" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <circle cx="150" cy="153" r="16" fill="none" stroke="#3a444f"/>
+          <!-- mangueras -->
+          <path d="M110 140 q-14 -22 6 -34" fill="none" stroke="#3a444f"/>
+          <path d="M190 140 q14 -22 -6 -34" fill="none" stroke="#3a444f"/>
+          <!-- luces traseras -->
+          <rect x="66" y="146" width="12" height="16" fill="none" stroke="#3a444f"/>
+          <rect x="222" y="146" width="12" height="16" fill="none" stroke="#3a444f"/>
+          <!-- faldones -->
+          <rect x="52" y="176" width="40" height="34" fill="none" stroke="#3a444f"/>
+          <rect x="208" y="176" width="40" height="34" fill="none" stroke="#3a444f"/>
+          <!-- llantas -->
+          <circle cx="100" cy="196" r="20" fill="none" stroke="#5b6776" stroke-width="3"/>
+          <circle cx="200" cy="196" r="20" fill="none" stroke="#5b6776" stroke-width="3"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="view-card" style="grid-column:1/-1;">
+      <h3>Vista superior</h3>
+      <div class="view-wrap" data-vista="SUPERIOR">
+        <svg viewBox="0 0 700 220" xmlns="http://www.w3.org/2000/svg">
+          <!-- techo cabina -->
+          <rect x="60" y="50" width="180" height="120" rx="14" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <!-- chasis hacia atrás -->
+          <rect x="240" y="72" width="380" height="76" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <line x1="240" y1="110" x2="620" y2="110" stroke="#3a444f" stroke-width="1"/>
+          <!-- quinta rueda -->
+          <circle cx="520" cy="110" r="34" fill="none" stroke="#3a444f" stroke-width="2"/>
+          <circle cx="520" cy="110" r="12" fill="none" stroke="#3a444f"/>
+          <!-- espejos -->
+          <rect x="34" y="72" width="22" height="16" fill="none" stroke="#3a444f"/>
+          <rect x="34" y="132" width="22" height="16" fill="none" stroke="#3a444f"/>
+          <!-- llantas -->
+          <rect x="86" y="28" width="34" height="18" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <rect x="86" y="174" width="34" height="18" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <rect x="430" y="52" width="34" height="18" fill="none" stroke="#5b6776" stroke-width="2"/>
+          <rect x="430" y="150" width="34" height="18" fill="none" stroke="#5b6776" stroke-width="2"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><i style="background:#e0a32e"></i> Raspones</span>
+    <span><i style="background:#d65c5c"></i> Golpes</span>
+    <span><i style="background:#6f9fd6"></i> Abolladuras</span>
+    <span><i style="background:#b85cd6"></i> Perforaciones</span>
+    <span><i style="background:#8d99a8"></i> Otros</span>
+  </div>
+</div>
+
+<!-- ── Puntos a revisar, agrupados por vista ───────────────── -->
+<div class="panel">
+  <h2>Puntos a revisar</h2>
+  <p class="hint">Deja en blanco los puntos que no apliquen: solo se guardan los que tengan estado marcado.</p>
+  <div id="contenedorPuntos"></div>
+</div>
+
+<!-- ── Observaciones y estado general ──────────────────────── -->
+<div class="panel">
+  <h2>Observaciones y estado general</h2>
+  <div class="grid grid-2">
+    <div class="field">
+      <label>Observaciones</label>
+      <textarea id="observaciones" rows="5" placeholder="Detalle de lo observado durante la inspección"></textarea>
+    </div>
+    <div class="field">
+      <label>Estado general de la unidad</label>
+      <div class="radio-pill" style="flex-direction:column;align-items:flex-start;gap:8px;">
+        <label><input type="radio" name="estadoGeneral" value="SIN_DANOS"> Sin daños</label>
+        <label><input type="radio" name="estadoGeneral" value="CON_DANOS"> Con daños (ver observaciones)</label>
+        <label><input type="radio" name="estadoGeneral" value="NO_APLICA"> No aplica</label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="actions" style="margin-bottom:28px;">
+  <button class="ghost" type="button" id="btnLimpiar">Limpiar formulario</button>
+  <button class="primary" type="button" id="btnGuardar">Guardar check</button>
+</div>
+
+<script src="js/checktracto.js?v=1"></script>
+</body>
+</html>
