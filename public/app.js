@@ -242,6 +242,7 @@ async function guardarCheck() {
     }
     toast(editingId ? `Check #${editingId} actualizado ✓` : `Check guardado (ID ${data.id}) ✓`, false);
     document.getElementById('btnExportarPdf').style.display = 'block';
+    document.getElementById('btnEnviarCorreo').style.display = 'block';
   } catch (err) {
     console.error(err);
     toast('Error: ' + err.message, true);
@@ -441,6 +442,7 @@ function nuevoCheck() {
   renderTablaLlantas();
   renderTablaComponentes();
   document.getElementById('btnExportarPdf').style.display = 'none';
+  document.getElementById('btnEnviarCorreo').style.display = 'none';
   toast('Formulario listo para un nuevo check', false);
   
 }
@@ -579,11 +581,12 @@ function construirHtmlPdf() {
   </div>`;
 }
 
-async function exportarPDF() {
+// Arma el PDF y devuelve la instancia de jsPDF, sin descargarlo: lo
+// reusan la exportación y el envío por correo.
+async function generarPDF() {
   if (typeof html2canvas==='undefined' || typeof window.jspdf==='undefined') {
-    toast('Librerías de PDF no cargadas (requiere internet)', true); return;
+    throw new Error('Librerías de PDF no cargadas (requiere internet)');
   }
-  toast('Generando PDF…', false);
   const sheet = document.getElementById('pdfSheet');
   sheet.innerHTML = construirHtmlPdf();
 
@@ -641,13 +644,46 @@ async function exportarPDF() {
       primeraPagina = false;
     }
 
+    return pdf;
+  } finally {
+    sheet.innerHTML = '';
+  }
+}
+
+async function exportarPDF() {
+  try {
+    toast('Generando PDF…', false);
+    const pdf = await generarPDF();
     pdf.save(`check-caja-seca${editingId ? '-' + editingId : ''}.pdf`);
     toast('PDF generado ✓', false);
   } catch (err) {
     console.error(err);
     toast('Error PDF: ' + err.message, true);
-  } finally {
-    sheet.innerHTML = '';
+  }
+}
+
+// Manda el check con su PDF adjunto. El PDF se genera aquí y no en el
+// servidor porque es jsPDF quien conoce el formato impreso.
+async function enviarCheckPorCorreo() {
+  if (!editingId) {
+    toast('Guarda el check antes de enviarlo por correo', true);
+    return;
+  }
+  if (!confirm('¿Enviar este check por correo a la cuenta de notificaciones del sistema?')) return;
+
+  try {
+    toast('Generando PDF y enviando…', false);
+    const pdf = await generarPDF();
+
+    const formData = new FormData();
+    formData.append('pdf', pdf.output('blob'), 'check.pdf');
+
+    const res = await fetch(`/api/checks/${editingId}/enviar`, { method: 'POST', body: formData });
+    const json = await res.json();
+    toast(json.message, !json.success);
+  } catch (err) {
+    console.error(err);
+    toast('Error al enviar: ' + err.message, true);
   }
 }
 
@@ -678,6 +714,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarCheck(id);
   });
   document.getElementById('btnExportarPdf').addEventListener('click', exportarPDF);
+  document.getElementById('btnEnviarCorreo').addEventListener('click', enviarCheckPorCorreo);
   document.getElementById('busqueda').addEventListener('keydown', e => {
     if (e.key === 'Enter') buscarChecks();
   });

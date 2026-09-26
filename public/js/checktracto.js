@@ -348,6 +348,29 @@ async function eliminarCheck(id) {
   }
 }
 
+// Este check no genera PDF: el detalle completo viaja en el cuerpo
+// del correo, armado en el servidor desde la base.
+async function enviarCheckPorCorreo() {
+    if (!editingId) {
+        return showAlert('Guarda el check antes de enviarlo por correo.', 'info');
+    }
+
+    const ok = await showConfirm(
+        '¿Enviar este check por correo a la cuenta de notificaciones del sistema?',
+        { title: 'Enviar check', confirmText: 'Enviar' }
+    );
+    if (!ok) return;
+
+    try {
+        const res = await fetch(`/api/trailer-checks/${editingId}/enviar`, { method: 'POST' });
+        const json = await res.json();
+        showAlert(json.message, json.success ? 'success' : 'error');
+    } catch (error) {
+        console.error('Error al enviar el check:', error);
+        showAlert('Error de conexión al enviar el check.', 'error');
+    }
+}
+
 // ── Listado ──────────────────────────────────────────────────
 async function buscarChecks() {
   const tbody = document.getElementById('tablaChecks');
@@ -414,6 +437,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnLimpiar').addEventListener('click', limpiarFormulario);
   document.getElementById('btnNuevo').addEventListener('click', limpiarFormulario);
   document.getElementById('btnBuscar').addEventListener('click', buscarChecks);
+  document.getElementById('btnEnviarCorreo').addEventListener('click', enviarCheckPorCorreo);
 
   buscarChecks();
 });

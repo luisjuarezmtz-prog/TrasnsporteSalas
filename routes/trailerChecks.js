@@ -21,6 +21,7 @@ const {
   ESTADOS_GENERALES,
   componenteValido,
 } = require('../utils/checkTracto');
+const { enviarCheckTracto } = require('../utils/correoChecks');
 
 // --- CATÁLOGO PARA LA PANTALLA ---
 router.get('/trailer-checks/catalogo', (_req, res) => {
@@ -215,6 +216,22 @@ router.get('/trailer-checks/:id', async (req, res) => {
   } catch (err) {
     console.error('Error al consultar el check de tracto:', err);
     res.status(500).json({ success: false, message: 'Error al consultar el check.' });
+  }
+});
+
+// --- ENVIAR POR CORREO ---
+// Este check no genera PDF, así que el detalle completo va en el
+// cuerpo del correo (ver utils/correoChecks.js).
+router.post('/trailer-checks/:id/enviar', async (req, res) => {
+  try {
+    const r = await enviarCheckTracto(req.params.id);
+    res.json({
+      success: true,
+      message: `Check de ${r.unidad || 'la unidad'} enviado (${r.puntos} punto(s), ${r.marcas} marca(s) de daño).`,
+    });
+  } catch (err) {
+    console.error('Error al enviar el check de tracto por correo:', err);
+    res.status(500).json({ success: false, message: `No se pudo enviar el correo: ${err.message}` });
   }
 });
 

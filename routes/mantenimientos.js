@@ -39,6 +39,7 @@ const uploadDocumento = multer({
 
 const TIPOS = ['MANTENIMIENTO', 'GESTORIA'];
 const TIPOS_UNIDAD = ['TRAILER', 'CAJA'];
+const TIPOS_DOCUMENTO = ['FACTURA', 'COMPROBANTE_PAGO', 'OTRO'];
 
 // Ciclo de vida de la orden. Solo se permiten estos saltos: evita que
 // una orden concluida vuelva a "solicitada" o que se salte la
@@ -257,6 +258,42 @@ router.put('/mantenimientos/:id/estatus', async (req, res) => {
   }
 });
 
+// --- REGISTRAR / QUITAR EL PAGO ---
+// Concluir y pagar son momentos distintos: el taller puede entregar el
+// día 10 y cobrarse el día 30. Por eso el pago tiene su propio endpoint
+// y no viaja en el PUT general, que está bloqueado tras la autorización.
+router.put('/mantenimientos/:id/pago', async (req, res) => {
+  const fechaPago = req.body.fechaPago || null;
+
+  try {
+    const [[actual]] = await dbPromesa.query(
+      'SELECT ESTATUS FROM mantenimientos WHERE ID_MANTENIMIENTO = ?',
+      [req.params.id]
+    );
+    if (!actual) return res.status(404).json({ success: false, message: 'Registro no encontrado.' });
+
+    // Pagar algo que todavía no se autoriza no tiene sentido.
+    if (fechaPago && !['AUTORIZADA', 'EN_PROCESO', 'CONCLUIDA'].includes(actual.ESTATUS)) {
+      return res.status(400).json({
+        success: false,
+        message: `No se puede registrar el pago de una orden ${actual.ESTATUS.toLowerCase()}.`,
+      });
+    }
+
+    await dbPromesa.query(
+      'UPDATE mantenimientos SET FECHA_PAGO = ? WHERE ID_MANTENIMIENTO = ?',
+      [fechaPago, req.params.id]
+    );
+    res.json({
+      success: true,
+      message: fechaPago ? 'Pago registrado.' : 'Se quitó la fecha de pago.',
+    });
+  } catch (err) {
+    console.error('Error al registrar el pago del mantenimiento:', err);
+    res.status(500).json({ success: false, message: 'Error al registrar el pago.' });
+  }
+});
+
 // --- LISTADO ---
 router.get('/mantenimientos', async (req, res) => {
   const { tipo, estatus, trailer, fechaInicio, fechaFin } = req.query;
@@ -278,6 +315,8 @@ router.get('/mantenimientos', async (req, res) => {
               p.NOMBRE_EMPRESARIAL AS PROVEEDOR,
               t.NO_ECONOMICO,
               (SELECT COUNT(*) FROM mantenimiento_documentos d WHERE d.ID_MANTENIMIENTO = m.ID_MANTENIMIENTO) AS TOTAL_DOCUMENTOS,
+              (SELECT COUNT(*) FROM mantenimiento_documentos d
+                WHERE d.ID_MANTENIMIENTO = m.ID_MANTENIMIENTO AND d.TIPO_DOCUMENTO = 'COMPROBANTE_PAGO') AS TIENE_COMPROBANTE_PAGO,
               (m.MONTO_REAL - m.MONTO_ESTIMADO) AS DIFERENCIA
          FROM mantenimientos m
          INNER JOIN c_tipos_mantenimiento c ON c.ID_TIPO = m.ID_TIPO
@@ -308,7 +347,7 @@ router.get('/mantenimientos/:id', async (req, res) => {
     if (!registro) return res.status(404).json({ success: false, message: 'Registro no encontrado.' });
 
     const [documentos] = await dbPromesa.query(
-      'SELECT ID_DOCUMENTO, FILE_PATH, FILE_NAME, UPLOAD_DATE FROM mantenimiento_documentos WHERE ID_MANTENIMIENTO = ? ORDER BY UPLOAD_DATE DESC',
+      'SELECT ID_DOCUMENTO, TIPO_DOCUMENTO, FILE_PATH, FILE_NAME, UPLOAD_DATE FROM mantenimiento_documentos WHERE ID_MANTENIMIENTO = ? ORDER BY UPLOAD_DATE DESC',
       [req.params.id]
     );
 
@@ -323,12 +362,16 @@ router.get('/mantenimientos/:id', async (req, res) => {
 router.post('/mantenimientos/:id/documentos', uploadDocumento.single('documento'), async (req, res) => {
   if (!req.file) return res.status(400).json({ success: false, message: 'No se recibió ningún archivo.' });
 
+  const tipoDocumento = TIPOS_DOCUMENTO.includes(req.body.tipoDocumento)
+    ? req.body.tipoDocumento
+    : 'FACTURA';
+
   try {
     const [resultado] = await dbPromesa.query(
-      'INSERT INTO mantenimiento_documentos (ID_MANTENIMIENTO, FILE_PATH, FILE_NAME) VALUES (?, ?, ?)',
-      [req.params.id, `/uploads/mantenimientos/${req.file.filename}`, req.file.originalname]
+      'INSERT INTO mantenimiento_documentos (ID_MANTENIMIENTO, TIPO_DOCUMENTO, FILE_PATH, FILE_NAME) VALUES (?, ?, ?, ?)',
+      [req.params.id, tipoDocumento, `/uploads/mantenimientos/${req.file.filename}`, req.file.originalname]
     );
-    res.json({ success: true, message: 'Comprobante agregado.', id_documento: resultado.insertId });
+    res.json({ success: true, message: 'Documento agregado.', id_documento: resultado.insertId });
   } catch (err) {
     console.error('Error al guardar el comprobante:', err);
     res.status(500).json({ success: false, message: 'Error al guardar el comprobante.' });

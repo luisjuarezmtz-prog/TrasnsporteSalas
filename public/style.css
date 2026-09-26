@@ -53,8 +53,10 @@ body{padding:24px;max-width:1200px;margin:0 auto;}
 .grid-2{grid-template-columns:repeat(2,1fr);}
 .grid-3{grid-template-columns:repeat(3,1fr);}
 .grid-4{grid-template-columns:repeat(4,1fr);}
-@media(max-width:860px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr 1fr;}}
-@media(max-width:540px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}}
+.grid-5{grid-template-columns:repeat(5,1fr);}
+@media(max-width:1100px){.grid-5{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:860px){.grid-2,.grid-3,.grid-4,.grid-5{grid-template-columns:1fr 1fr;}}
+@media(max-width:540px){.grid-2,.grid-3,.grid-4,.grid-5{grid-template-columns:1fr;}}
 
 /* ── Campos ────────────────────────────────────────────────── */
 label{font-size:11px;color:var(--ink-dim);text-transform:uppercase;

@@ -7,6 +7,7 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const { db, dbPromesa } = require('../config/db');
+const { enviarCheckCaja } = require('../utils/correoChecks');
 
 // ── Subida de archivos (Tarjeta de Circulación) ──────────────────────────────
 // En Hostinger (Node.js App Manager) cada "Redesplegar" crea una carpeta de
@@ -275,6 +276,30 @@ router.get('/checks/:id', async (req, res) => {
     const [marcas] = await dbPromesa.query(`SELECT * FROM marcas_dano  WHERE check_id=?`, [req.params.id]);
     res.json({ check, llantas, componentes, marcas });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── POST /api/checks/:id/enviar ───────────────────────────────────────────────
+// El PDF viene del navegador porque es jsPDF quien arma el formato.
+// memoryStorage: el archivo es solo un adjunto de paso, no hay razón
+// para dejarlo en disco.
+const uploadPdfMemoria = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+});
+
+router.post('/checks/:id/enviar', uploadPdfMemoria.single('pdf'), async (req, res) => {
+  try {
+    const resultado = await enviarCheckCaja(req.params.id, req.file ? req.file.buffer : null);
+    res.json({
+      success: true,
+      message: resultado.conAdjunto
+        ? `Check de ${resultado.identificacion} enviado con el PDF adjunto.`
+        : `Check de ${resultado.identificacion} enviado (sin PDF adjunto).`,
+    });
+  } catch (err) {
+    console.error('Error al enviar el check de caja por correo:', err);
+    res.status(500).json({ success: false, message: `No se pudo enviar el correo: ${err.message}` });
+  }
 });
 
 // ── DELETE /api/checks/:id ────────────────────────────────────────────────────

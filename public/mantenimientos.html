@@ -16,11 +16,12 @@
     <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
 </div>
 
-<div class="grid grid-4" style="margin-bottom:18px;">
+<div class="grid grid-5" style="margin-bottom:18px;">
     <div class="stat-card"><div class="stat-label">Por autorizar</div><div id="kpiSolicitadas" class="stat-value amber">—</div></div>
     <div class="stat-card"><div class="stat-label">En proceso</div><div id="kpiProceso" class="stat-value">—</div></div>
     <div class="stat-card"><div class="stat-label">Autorizado (estimado)</div><div id="kpiEstimado" class="stat-value">—</div></div>
     <div class="stat-card"><div class="stat-label">Gasto real concluido</div><div id="kpiReal" class="stat-value bad">—</div></div>
+    <div class="stat-card"><div class="stat-label">Pendiente por pagar</div><div id="kpiPorPagar" class="stat-value amber">—</div></div>
 </div>
 
 <div class="panel">
@@ -67,12 +68,13 @@
                 <th>Solicitud</th>
                 <th class="text-right">Estimado</th>
                 <th class="text-right">Real</th>
+                <th>Pago</th>
                 <th>Estatus</th>
                 <th class="text-center">Acciones</th>
             </tr>
         </thead>
         <tbody id="tablaCuerpo">
-            <tr><td colspan="10" class="text-center hint">Cargando...</td></tr>
+            <tr><td colspan="11" class="text-center hint">Cargando...</td></tr>
         </tbody>
     </table>
     <p class="hint" id="contador" style="margin-top:10px;"></p>
@@ -166,17 +168,36 @@
 
                 <!-- Solo aplica una vez que la orden existe -->
                 <div id="bloquePosterior" hidden>
-                    <h6 class="seccion">Comprobantes</h6>
-                    <div class="grid" style="grid-template-columns:1fr auto;gap:12px;align-items:end;margin-bottom:12px;">
+                    <h6 class="seccion">Pago</h6>
+                    <div class="grid" style="grid-template-columns:1fr auto auto;gap:12px;align-items:end;margin-bottom:8px;">
                         <div class="field">
-                            <label>Factura o documento (PDF, JPG o PNG)</label>
+                            <label>Fecha de pago</label>
+                            <input type="date" id="fechaPago">
+                        </div>
+                        <button type="button" class="ghost" onclick="registrarPago()">💵 Registrar pago</button>
+                        <button type="button" class="ghost" onclick="quitarPago()">Quitar</button>
+                    </div>
+                    <p class="hint" id="avisoPago" style="margin:0 0 14px;"></p>
+
+                    <h6 class="seccion">Comprobantes</h6>
+                    <div class="grid" style="grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin-bottom:12px;">
+                        <div class="field">
+                            <label>Tipo de documento</label>
+                            <select id="tipoDocumento">
+                                <option value="FACTURA">Factura del proveedor</option>
+                                <option value="COMPROBANTE_PAGO">Comprobante de pago</option>
+                                <option value="OTRO">Otro</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Archivo (PDF, JPG o PNG)</label>
                             <input type="file" id="inputDocumento" accept="application/pdf,image/png,image/jpeg">
                         </div>
                         <button type="button" class="ghost" onclick="subirDocumento()">➕ Agregar</button>
                     </div>
                     <table>
-                        <thead><tr><th>Archivo</th><th>Fecha</th><th class="text-center">Acciones</th></tr></thead>
-                        <tbody id="tablaDocumentos"><tr><td colspan="3" class="text-center hint">Sin comprobantes.</td></tr></tbody>
+                        <thead><tr><th>Tipo</th><th>Archivo</th><th>Fecha</th><th class="text-center">Acciones</th></tr></thead>
+                        <tbody id="tablaDocumentos"><tr><td colspan="4" class="text-center hint">Sin comprobantes.</td></tr></tbody>
                     </table>
                 </div>
             </div>
@@ -310,7 +331,7 @@
     // ───────────────────────── LISTADO ─────────────────────────
     async function cargarLista() {
         const tbody = document.getElementById('tablaCuerpo');
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center hint">Cargando...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center hint">Cargando...</td></tr>';
 
         const params = new URLSearchParams();
         const tipo = document.getElementById('filtroTipo').value;
@@ -326,7 +347,7 @@
             const json = await res.json();
 
             if (!json.success || json.data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center hint">No hay órdenes registradas.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="text-center hint">No hay órdenes registradas.</td></tr>';
                 document.getElementById('contador').textContent = '';
                 pintarKpis([]);
                 return;
@@ -348,6 +369,9 @@
                     <td class="text-right">${m.MONTO_REAL !== null
                         ? `${formatMoney(m.MONTO_REAL)}${diferencia ? `<span class="hint" style="display:block;color:${diferencia > 0 ? 'var(--bad)' : 'var(--ok)'};">${diferencia > 0 ? '+' : ''}${formatMoney(diferencia)}</span>` : ''}`
                         : '—'}</td>
+                    <td>${m.FECHA_PAGO
+                        ? `<span class="badge badge-ok">${formatoFecha(m.FECHA_PAGO)}</span>${Number(m.TIENE_COMPROBANTE_PAGO) ? '' : '<span class="hint" style="display:block;">sin comprobante</span>'}`
+                        : '<span class="hint">Pendiente</span>'}</td>
                     <td><span class="badge ${clase}">${texto}</span></td>
                     <td class="text-center"><button class="ghost" title="Ver / editar" onclick="abrirModalEdicion(${m.ID_MANTENIMIENTO})">✏️</button></td>`;
                 tbody.appendChild(tr);
@@ -357,7 +381,7 @@
             pintarKpis(json.data);
         } catch (error) {
             console.error('Error al cargar la lista:', error);
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
         }
     }
 
@@ -375,7 +399,13 @@
         document.getElementById('kpiSolicitadas').textContent = solicitadas;
         document.getElementById('kpiProceso').textContent = proceso;
         document.getElementById('kpiEstimado').textContent = formatMoney(estimado);
+        // Concluidas sin fecha de pago: es lo que todavía se le debe al taller.
+        const porPagar = datos
+            .filter(m => m.ESTATUS === 'CONCLUIDA' && !m.FECHA_PAGO)
+            .reduce((a, m) => a + Number(m.MONTO_REAL || 0), 0);
+
         document.getElementById('kpiReal').textContent = formatMoney(real);
+        document.getElementById('kpiPorPagar').textContent = formatMoney(porPagar);
     }
 
     // ───────────────────────── ALTA / CAMBIO ─────────────────────────
@@ -454,6 +484,10 @@
 
             pintarAccionesFlujo(m.ESTATUS);
             document.getElementById('bloquePosterior').hidden = false;
+            document.getElementById('fechaPago').value = aValorDeInput(m.FECHA_PAGO);
+            document.getElementById('avisoPago').innerHTML = m.FECHA_PAGO
+                ? `Pagada el <b>${formatoFecha(m.FECHA_PAGO)}</b>. Sube el comprobante de pago con el tipo correspondiente.`
+                : 'Concluir y pagar son momentos distintos: se puede entregar el trabajo un día y liquidarlo otro.';
             pintarDocumentos(m.documentos || []);
 
             modalOrden.show();
@@ -573,17 +607,54 @@
         }
     }
 
+    // ───────────────────────── PAGO ─────────────────────────
+    async function enviarPago(fechaPago) {
+        const id = document.getElementById('edit_id').value;
+        try {
+            const res = await fetch(`/api/mantenimientos/${id}/pago`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fechaPago }),
+            });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) { cargarLista(); abrirModalEdicion(id); }
+        } catch (error) {
+            console.error('Error al registrar el pago:', error);
+            showAlert('Error de conexión al registrar el pago.', 'error');
+        }
+    }
+
+    function registrarPago() {
+        const fecha = document.getElementById('fechaPago').value;
+        if (!fecha) return showAlert('Captura la fecha de pago.', 'info');
+        enviarPago(fecha);
+    }
+
+    async function quitarPago() {
+        const ok = await showConfirm('¿Quitar la fecha de pago de esta orden?', { type: 'danger', title: 'Quitar pago' });
+        if (ok) enviarPago(null);
+    }
+
     // ───────────────────────── COMPROBANTES ─────────────────────────
+    const ETIQUETA_DOCUMENTO = {
+        FACTURA: ['badge-info', 'Factura'],
+        COMPROBANTE_PAGO: ['badge-ok', 'Comprobante de pago'],
+        OTRO: ['badge-muted', 'Otro'],
+    };
+
     function pintarDocumentos(documentos) {
         const tbody = document.getElementById('tablaDocumentos');
         if (documentos.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center hint">Sin comprobantes.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center hint">Sin comprobantes.</td></tr>';
             return;
         }
         tbody.innerHTML = '';
         documentos.forEach(d => {
+            const [clase, texto] = ETIQUETA_DOCUMENTO[d.TIPO_DOCUMENTO] || ETIQUETA_DOCUMENTO.OTRO;
             const tr = document.createElement('tr');
             tr.innerHTML = `
+                <td><span class="badge ${clase}">${texto}</span></td>
                 <td><a href="${escapeHtml(d.FILE_PATH)}" target="_blank" rel="noopener">${escapeHtml(d.FILE_NAME)}</a></td>
                 <td>${formatoFecha(d.UPLOAD_DATE)}</td>
                 <td class="text-center"><button class="ghost" title="Eliminar" onclick="eliminarDocumento(${d.ID_DOCUMENTO})">🗑️</button></td>`;
@@ -598,6 +669,7 @@
 
         const formData = new FormData();
         formData.append('documento', input.files[0]);
+        formData.append('tipoDocumento', document.getElementById('tipoDocumento').value);
 
         try {
             const res = await fetch(`/api/mantenimientos/${id}/documentos`, { method: 'POST', body: formData });
