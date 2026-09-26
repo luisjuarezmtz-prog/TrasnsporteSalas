@@ -13,7 +13,9 @@
     <div class="sidebar">
         <h2>Transportes Salas</h2>
         
-        <button class="tab-btn active" onclick="openTab(event, 'inicio')">🏠 Inicio</button>    
+        <div id="grupo-inicio">
+            <button class="tab-btn active" id="btnInicio" onclick="openTab(event, 'inicio')">🏠 Inicio</button>
+        </div>
         
         <div id="grupo-viajes">
             <button class="dropdown-btn">📊 Gestión de Viajes</button>
@@ -201,6 +203,15 @@
             </div>
         </div>
 
+        <!-- Se muestra solo si el rol no tiene permitido el Resumen General. -->
+        <div id="sinAccesoInicio" class="panel" style="display:none;">
+            <h2>Sin acceso al Resumen General</h2>
+            <p class="hint" style="font-size:13px;">
+                Tu rol no tiene permitido ver el resumen de la empresa. Usa el menú de la izquierda
+                para entrar a los módulos que sí tienes asignados.
+            </p>
+        </div>
+
         <div id="ajustes" class="tab-content">
             <div class="panel">
                 <h2>Configuración</h2>
@@ -232,13 +243,23 @@
 
                     // Todos los grupos del sidebar que están sujetos a permisos
                     // (deben coincidir con MODULE_KEY en c_system_modules).
-                    const grupos = ['grupo-viajes', 'grupo-tarimas', 'grupo-empleados', 'grupo-personal-externo', 'grupo-nomina', 'grupo-cxc', 'grupo-cajas', 'grupo-reportes', 'grupo-admin'];
+                    const grupos = ['grupo-inicio', 'grupo-viajes', 'grupo-tarimas', 'grupo-empleados', 'grupo-personal-externo', 'grupo-nomina', 'grupo-cxc', 'grupo-cajas', 'grupo-reportes', 'grupo-admin'];
 
                     grupos.forEach(idGrupo => {
                         const el = document.getElementById(idGrupo);
                         if (!el) return;
                         el.style.display = modulosPermitidos.has(idGrupo) ? '' : 'none';
                     });
+
+                    // Inicio es la pestaña que abre por default. Si el rol no
+                    // la tiene permitida hay que ocultar también su contenido y
+                    // decirlo, o el usuario se queda viendo un área en blanco
+                    // sin saber por qué.
+                    if (!modulosPermitidos.has('grupo-inicio')) {
+                        const contenido = document.getElementById('inicio');
+                        contenido.classList.remove('active');
+                        document.getElementById('sinAccesoInicio').style.display = '';
+                    }
 
                     // Dentro de cada grupo visible, se ocultan además las opciones
                     // (submódulos) que el rol no tiene permitidas de forma individual
