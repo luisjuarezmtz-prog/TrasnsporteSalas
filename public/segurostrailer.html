@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seguros de Tráiler - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>🛡️ Seguros de Tráiler</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+
+<div class="panel">
+    <div class="grid" style="grid-template-columns:2fr 1fr auto auto;gap:12px;align-items:end;margin-bottom:18px;">
+        <div class="field">
+            <label>Unidad</label>
+            <select id="filtroTrailer"><option value="">Todas</option></select>
+        </div>
+        <div class="field">
+            <label>Estatus</label>
+            <select id="filtroEstatus">
+                <option value="">Todos</option>
+                <option value="1" selected>Vigentes</option>
+                <option value="0">Canceladas</option>
+            </select>
+        </div>
+        <button class="primary" onclick="cargarSeguros()">🔍 Buscar</button>
+        <button class="primary" onclick="abrirModalAlta()">➕ Nueva Póliza</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Unidad</th>
+                <th>Aseguradora</th>
+                <th>Póliza</th>
+                <th class="text-right">Valor</th>
+                <th class="text-right">Pagado</th>
+                <th class="text-right">Saldo</th>
+                <th>Avance</th>
+                <th>Próximo pago</th>
+                <th>Vence</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            <tr><td colspan="10" class="text-center hint">Cargando pólizas...</td></tr>
+        </tbody>
+    </table>
+    <p class="hint" id="contadorRegistros" style="margin-top:10px;"></p>
+</div>
+
+<!-- MODAL ALTA / CAMBIO -->
+<div class="modal fade" id="modalSeguro" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloModal">➕ Nueva Póliza</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit_id">
+
+                <h6 class="seccion">Póliza</h6>
+                <div class="grid grid-2" style="margin-bottom:10px;">
+                    <div class="field">
+                        <label>Unidad *</label>
+                        <select id="idTrailer"><option value="">-- Seleccione --</option></select>
+                    </div>
+                    <div class="field">
+                        <label>Aseguradora (proveedor) *</label>
+                        <select id="idProveedor"><option value="">-- Seleccione --</option></select>
+                    </div>
+                </div>
+                <p class="hint" id="avisoProveedor" style="margin:0 0 12px;">
+                    Sin proveedor no se puede registrar el seguro. Si la aseguradora no aparece,
+                    <a href="proveedores.html">regístrala en Proveedores</a>.
+                </p>
+
+                <div class="grid grid-3" style="margin-bottom:14px;">
+                    <div class="field">
+                        <label>No. de Póliza</label>
+                        <input type="text" id="numeroPoliza">
+                    </div>
+                    <div class="field">
+                        <label>Vigencia desde</label>
+                        <input type="date" id="fechaInicio">
+                    </div>
+                    <div class="field">
+                        <label>Vigencia hasta</label>
+                        <input type="date" id="fechaVencimiento">
+                    </div>
+                </div>
+
+                <h6 class="seccion">Pagos</h6>
+                <div class="grid grid-4" style="margin-bottom:12px;">
+                    <div class="field">
+                        <label>Valor del seguro *</label>
+                        <input type="number" id="valorSeguro" min="0" step="0.01">
+                    </div>
+                    <div class="field">
+                        <label>Plazo (meses) *</label>
+                        <input type="number" id="plazoMeses" min="1" step="1" value="12">
+                    </div>
+                    <div class="field">
+                        <label>Primer pago</label>
+                        <input type="number" id="primerPago" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="field">
+                        <label>Fecha 1er pago *</label>
+                        <input type="date" id="fechaPrimerPago">
+                    </div>
+                </div>
+                <p class="hint" style="margin:0 0 12px;">
+                    El primer pago se captura a mano; lo que resta se reparte en partes iguales
+                    entre los meses restantes. El redondeo se ajusta en el último pago para que
+                    la suma cuadre exacto contra el valor de la póliza.
+                </p>
+
+                <div class="actions" style="margin-bottom:12px;">
+                    <button type="button" class="ghost" onclick="previsualizarPlan()">🔄 Calcular plan de pagos</button>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Fecha programada</th>
+                            <th class="text-right">Monto</th>
+                            <th class="text-center">Pagado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaPagos">
+                        <tr><td colspan="4" class="text-center hint">Captura el valor, el plazo y la fecha, y da clic en Calcular.</td></tr>
+                    </tbody>
+                    <tfoot>
+                        <tr style="font-weight:700;">
+                            <td colspan="2" class="text-right">TOTAL DEL PLAN:</td>
+                            <td class="text-right" id="totalPlan">$0.00</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <h6 class="seccion">Observaciones</h6>
+                <div class="field">
+                    <textarea id="observaciones" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="primary" onclick="guardarSeguro()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .seccion {
+        font-family: var(--mono); font-size: 12px; text-transform: uppercase;
+        color: var(--amber); border-bottom: 1px solid var(--line);
+        padding-bottom: 6px; margin: 22px 0 14px;
+    }
+    .seccion:first-of-type { margin-top: 0; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+    const formatMoney = (v) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v || 0);
+
+    function aValorDeInput(valor) {
+        if (!valor) return '';
+        const d = new Date(valor);
+        if (isNaN(d.getTime())) return '';
+        d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+        return d.toISOString().split('T')[0];
+    }
+    function formatoFecha(valor) {
+        const iso = aValorDeInput(valor);
+        if (!iso) return '—';
+        const [a, m, d] = iso.split('-');
+        return `${d}/${m}/${a}`;
+    }
+
+    let modalSeguro;
+    let pagosActuales = [];   // plan mostrado en el modal
+
+    // ───────────────────────── CATÁLOGOS ─────────────────────────
+    async function cargarCatalogos() {
+        try {
+            const res = await fetch('/api/trailer-seguros/catalogos');
+            const json = await res.json();
+            if (!json.success) return;
+
+            const selTrailer = document.getElementById('idTrailer');
+            const selFiltro = document.getElementById('filtroTrailer');
+            json.trailers.forEach(t => {
+                selTrailer.appendChild(new Option(t.NAME, t.ID_TRAILER));
+                selFiltro.appendChild(new Option(t.NAME, t.ID_TRAILER));
+            });
+
+            const selProv = document.getElementById('idProveedor');
+            json.proveedores.forEach(p => {
+                selProv.appendChild(new Option(p.NOMBRE_EMPRESARIAL || p.NOMBRE_PROVEEDOR, p.ID_PROVEEDOR));
+            });
+
+            // Sin aseguradoras autorizadas no se puede dar de alta nada:
+            // conviene que se note antes de llenar el formulario.
+            if (json.proveedores.length === 0) {
+                document.getElementById('avisoProveedor').style.color = 'var(--bad)';
+                document.getElementById('avisoProveedor').innerHTML =
+                    'No hay proveedores registrados. <a href="proveedores.html">Registra la aseguradora</a> antes de capturar el seguro.';
+            }
+        } catch (error) {
+            console.error('Error al cargar catálogos:', error);
+        }
+    }
+
+    // ───────────────────────── LISTADO ─────────────────────────
+    async function cargarSeguros() {
+        const tbody = document.getElementById('tablaCuerpo');
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center hint">Cargando pólizas...</td></tr>';
+
+        const params = new URLSearchParams();
+        const trailer = document.getElementById('filtroTrailer').value;
+        const estatus = document.getElementById('filtroEstatus').value;
+        if (trailer) params.set('trailer', trailer);
+        if (estatus) params.set('estatus', estatus);
+
+        try {
+            const res = await fetch(`/api/trailer-seguros?${params.toString()}`);
+            const json = await res.json();
+
+            if (!json.success || json.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center hint">No hay pólizas registradas.</td></tr>';
+                document.getElementById('contadorRegistros').textContent = '';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            json.data.forEach(s => {
+                const vigente = Number(s.ESTATUS) === 1;
+                const avance = s.TOTAL_PAGOS > 0 ? Math.round((s.PAGOS_CUBIERTOS / s.TOTAL_PAGOS) * 100) : 0;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escapeHtml(s.UNIDAD || '—')}</td>
+                    <td>${escapeHtml(s.PROVEEDOR || '—')}</td>
+                    <td style="font-family:var(--mono);">${escapeHtml(s.NUMERO_POLIZA || '—')}</td>
+                    <td class="text-right">${formatMoney(s.VALOR_SEGURO)}</td>
+                    <td class="text-right" style="color:var(--ok);">${formatMoney(s.TOTAL_PAGADO)}</td>
+                    <td class="text-right">${formatMoney(s.SALDO)}</td>
+                    <td style="width:150px;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <div class="progress-track" style="flex:1;">
+                                <div class="progress-fill ${avance === 100 ? 'ok' : ''}" style="width:${avance}%;"></div>
+                            </div>
+                            <span class="hint" style="margin:0;">${s.PAGOS_CUBIERTOS}/${s.TOTAL_PAGOS}</span>
+                        </div>
+                    </td>
+                    <td>${s.PROXIMO_PAGO_FECHA ? `${formatoFecha(s.PROXIMO_PAGO_FECHA)}<span class="hint" style="display:block;">${formatMoney(s.PROXIMO_PAGO_MONTO)}</span>` : '<span class="badge badge-ok">Liquidado</span>'}</td>
+                    <td>${formatoFecha(s.FECHA_VENCIMIENTO)}</td>
+                    <td class="text-center">
+                        <button class="ghost" title="Ver / editar" onclick="abrirModalEdicion(${s.ID_SEGURO})">✏️</button>
+                        <button class="ghost" title="${vigente ? 'Cancelar póliza' : 'Reactivar'}" onclick="cambiarEstatus(${s.ID_SEGURO}, ${vigente ? 0 : 1})">${vigente ? '🚫' : '♻️'}</button>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('contadorRegistros').textContent = `Mostrando ${json.data.length} póliza(s)`;
+        } catch (error) {
+            console.error('Error al cargar seguros:', error);
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+        }
+    }
+
+    // ───────────────────────── PLAN DE PAGOS ─────────────────────────
+    function datosFormulario() {
+        return {
+            idTrailer: document.getElementById('idTrailer').value || null,
+            idProveedor: document.getElementById('idProveedor').value || null,
+            numeroPoliza: document.getElementById('numeroPoliza').value,
+            valorSeguro: document.getElementById('valorSeguro').value,
+            plazoMeses: document.getElementById('plazoMeses').value,
+            primerPago: document.getElementById('primerPago').value || 0,
+            fechaPrimerPago: document.getElementById('fechaPrimerPago').value,
+            fechaInicio: document.getElementById('fechaInicio').value || null,
+            fechaVencimiento: document.getElementById('fechaVencimiento').value || null,
+            observaciones: document.getElementById('observaciones').value,
+            usuario: localStorage.getItem('username') || 'Sistema',
+        };
+    }
+
+    // El plan lo calcula el servidor (misma función con la que se va a
+    // guardar), para que la vista previa no pueda diferir del resultado.
+    async function previsualizarPlan() {
+        try {
+            const res = await fetch('/api/trailer-seguros/previsualizar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(datosFormulario()),
+            });
+            const json = await res.json();
+            if (!json.success) return showAlert(json.message, 'error');
+
+            pagosActuales = json.pagos.map(p => ({ ...p, pagado: 0 }));
+            pintarPlan();
+        } catch (error) {
+            console.error('Error al calcular el plan:', error);
+            showAlert('Error de conexión al calcular el plan.', 'error');
+        }
+    }
+
+    function pintarPlan() {
+        const tbody = document.getElementById('tablaPagos');
+        if (pagosActuales.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center hint">Captura el valor, el plazo y la fecha, y da clic en Calcular.</td></tr>';
+            document.getElementById('totalPlan').textContent = formatMoney(0);
+            return;
+        }
+
+        tbody.innerHTML = '';
+        let total = 0;
+        pagosActuales.forEach(p => {
+            total += Number(p.monto);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${p.numero}</td>
+                <td>${formatoFecha(p.fecha)}</td>
+                <td class="text-right">${formatMoney(p.monto)}</td>
+                <td class="text-center">${
+                    p.idPago
+                        ? `<input type="checkbox" ${p.pagado ? 'checked' : ''} onchange="marcarPago(${p.idPago}, this.checked)">`
+                        : '<span class="hint">—</span>'
+                }</td>`;
+            tbody.appendChild(tr);
+        });
+        document.getElementById('totalPlan').textContent = formatMoney(total);
+    }
+
+    async function marcarPago(idPago, pagado) {
+        try {
+            const res = await fetch(`/api/trailer-seguros/pagos/${idPago}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pagado }),
+            });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) {
+                const pago = pagosActuales.find(p => p.idPago === idPago);
+                if (pago) pago.pagado = pagado ? 1 : 0;
+                cargarSeguros();
+            }
+        } catch (error) {
+            console.error('Error al marcar el pago:', error);
+            showAlert('Error de conexión al marcar el pago.', 'error');
+        }
+    }
+
+    // ───────────────────────── ALTA / CAMBIO ─────────────────────────
+    function limpiarFormulario() {
+        document.getElementById('edit_id').value = '';
+        ['numeroPoliza', 'valorSeguro', 'fechaPrimerPago', 'fechaInicio', 'fechaVencimiento', 'observaciones']
+            .forEach(id => { document.getElementById(id).value = ''; });
+        document.getElementById('idTrailer').value = '';
+        document.getElementById('idProveedor').value = '';
+        document.getElementById('plazoMeses').value = 12;
+        document.getElementById('primerPago').value = 0;
+        pagosActuales = [];
+        pintarPlan();
+    }
+
+    function abrirModalAlta() {
+        limpiarFormulario();
+        document.getElementById('tituloModal').textContent = '➕ Nueva Póliza';
+        modalSeguro.show();
+    }
+
+    async function abrirModalEdicion(id) {
+        limpiarFormulario();
+        document.getElementById('tituloModal').textContent = '✏️ Editar Póliza';
+
+        try {
+            const res = await fetch(`/api/trailer-seguros/${id}`);
+            const json = await res.json();
+            if (!json.success) return showAlert(json.message, 'error');
+
+            const s = json.data;
+            document.getElementById('edit_id').value = id;
+            document.getElementById('idTrailer').value = s.ID_TRAILER;
+            document.getElementById('idProveedor').value = s.ID_PROVEEDOR;
+            document.getElementById('numeroPoliza').value = s.NUMERO_POLIZA || '';
+            document.getElementById('valorSeguro').value = s.VALOR_SEGURO;
+            document.getElementById('plazoMeses').value = s.PLAZO_MESES;
+            document.getElementById('primerPago').value = s.PRIMER_PAGO;
+            document.getElementById('fechaPrimerPago').value = aValorDeInput(s.FECHA_PRIMER_PAGO);
+            document.getElementById('fechaInicio').value = aValorDeInput(s.FECHA_INICIO);
+            document.getElementById('fechaVencimiento').value = aValorDeInput(s.FECHA_VENCIMIENTO);
+            document.getElementById('observaciones').value = s.OBSERVACIONES || '';
+
+            pagosActuales = (s.pagos || []).map(p => ({
+                idPago: p.ID_PAGO,
+                numero: p.NUMERO_PAGO,
+                fecha: aValorDeInput(p.FECHA_PROGRAMADA),
+                monto: Number(p.MONTO),
+                pagado: Number(p.PAGADO),
+            }));
+            pintarPlan();
+
+            modalSeguro.show();
+        } catch (error) {
+            console.error('Error al cargar la póliza:', error);
+            showAlert('Error de conexión al cargar la póliza.', 'error');
+        }
+    }
+
+    async function guardarSeguro() {
+        const id = document.getElementById('edit_id').value;
+        const datos = datosFormulario();
+
+        if (!datos.idTrailer) return showAlert('Selecciona la unidad.', 'info');
+        if (!datos.idProveedor) return showAlert('Selecciona la aseguradora: sin proveedor no se puede registrar el seguro.', 'info');
+
+        try {
+            const res = await fetch(id ? `/api/trailer-seguros/${id}` : '/api/trailer-seguros', {
+                method: id ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(datos),
+            });
+            const json = await res.json();
+            if (!json.success) return showAlert(json.message, 'error');
+
+            showAlert(json.message, 'success');
+            cargarSeguros();
+            abrirModalEdicion(id || json.id_seguro);
+        } catch (error) {
+            console.error('Error al guardar la póliza:', error);
+            showAlert('Error de conexión al guardar.', 'error');
+        }
+    }
+
+    async function cambiarEstatus(id, estatus) {
+        const ok = await showConfirm(
+            estatus === 0 ? '¿Cancelar esta póliza?' : '¿Reactivar esta póliza?',
+            { type: estatus === 0 ? 'danger' : 'success', title: estatus === 0 ? 'Cancelar póliza' : 'Reactivar' }
+        );
+        if (!ok) return;
+
+        try {
+            const res = await fetch(`/api/trailer-seguros/${id}/estatus`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estatus }),
+            });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) cargarSeguros();
+        } catch (error) {
+            console.error('Error al cambiar el estatus:', error);
+            showAlert('Error de conexión.', 'error');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        modalSeguro = new bootstrap.Modal(document.getElementById('modalSeguro'));
+        await cargarCatalogos();
+        cargarSeguros();
+    });
+</script>
+
+</body>
+</html>
