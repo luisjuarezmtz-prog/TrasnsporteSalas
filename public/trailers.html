@@ -291,6 +291,87 @@
                             <tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>
                         </tbody>
                     </table>
+
+                    <h6 class="seccion">Verificaciones físico-mecánicas</h6>
+                    <p class="hint" style="margin:0 0 12px;">
+                        Dictamen NOM-068-SCT-2-2014. La vigencia de la más reciente alimenta el
+                        <a href="vencimientos.html">control de vencimientos</a>.
+                    </p>
+                    <div class="grid grid-4" style="gap:12px;margin-bottom:10px;">
+                        <div class="field">
+                            <label>Folio del dictamen</label>
+                            <input type="text" id="v_folioDictamen">
+                        </div>
+                        <div class="field">
+                            <label>Fecha de verificación *</label>
+                            <input type="date" id="v_fechaVerificacion">
+                        </div>
+                        <div class="field">
+                            <label>Vigencia hasta</label>
+                            <input type="date" id="v_fechaVigencia">
+                        </div>
+                        <div class="field">
+                            <label>Resultado</label>
+                            <select id="v_resultado">
+                                <option value="">--</option>
+                                <option value="APROBADO">Aprobado</option>
+                                <option value="RECHAZADO">Rechazado</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-4" style="gap:12px;margin-bottom:10px;">
+                        <div class="field">
+                            <label>Tipo de servicio</label>
+                            <input type="text" id="v_tipoServicio" placeholder="Ej. CARGA GENERAL">
+                        </div>
+                        <div class="field">
+                            <label>Odómetro</label>
+                            <input type="number" id="v_odometro" min="0" step="1">
+                        </div>
+                        <div class="field">
+                            <label>Se presentó</label>
+                            <select id="v_sePresento">
+                                <option value="">--</option>
+                                <option value="VACIO">Vacío</option>
+                                <option value="CARGADO">Cargado</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Verificación anterior</label>
+                            <input type="date" id="v_fechaAnterior">
+                        </div>
+                    </div>
+                    <div class="grid" style="grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end;margin-bottom:14px;">
+                        <div class="field">
+                            <label>No. de aprobación</label>
+                            <input type="text" id="v_noAprobacion">
+                        </div>
+                        <div class="field">
+                            <label>No. de acreditación</label>
+                            <input type="text" id="v_noAcreditacion">
+                        </div>
+                        <div class="field">
+                            <label>Técnico</label>
+                            <input type="text" id="v_tecnico">
+                        </div>
+                        <button type="button" class="ghost" id="btnAgregarVerificacion" onclick="agregarVerificacion()">➕ Agregar</button>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Folio</th>
+                                <th>Verificación</th>
+                                <th>Vigencia</th>
+                                <th>Resultado</th>
+                                <th>Odómetro</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaVerificaciones">
+                            <tr><td colspan="6" class="text-center hint">Sin verificaciones.</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
             <div class="modal-footer">
@@ -420,6 +501,9 @@
         CAMPOS.forEach(campo => { document.getElementById(campo).value = ''; });
         document.getElementById('tablaDocumentosCuerpo').innerHTML =
             '<tr><td colspan="4" class="text-center hint">Sin documentos.</td></tr>';
+        document.getElementById('tablaVerificaciones').innerHTML =
+            '<tr><td colspan="6" class="text-center hint">Sin verificaciones.</td></tr>';
+        CAMPOS_VERIFICACION.forEach(id => { document.getElementById(id).value = ''; });
     }
 
     // Sin tráiler guardado no hay ID contra el cual subir archivos.
@@ -428,6 +512,8 @@
         document.getElementById('input_documento').disabled = !habilitado;
         document.querySelector('#seccionDocumentos button').disabled = !habilitado;
         document.getElementById('avisoDocumentos').hidden = habilitado;
+        CAMPOS_VERIFICACION.forEach(id => { document.getElementById(id).disabled = !habilitado; });
+        document.getElementById('btnAgregarVerificacion').disabled = !habilitado;
     }
 
     function abrirModalAlta() {
@@ -456,6 +542,7 @@
 
             habilitarDocumentos(true);
             cargarDocumentos(id);
+            cargarVerificaciones(id);
             modalTrailer.show();
         } catch (error) {
             console.error('Error al cargar el tráiler:', error);
@@ -490,6 +577,7 @@
                 document.getElementById('tituloModalTrailer').textContent = '✏️ Editar Tráiler';
                 habilitarDocumentos(true);
                 cargarDocumentos(json.id_trailer);
+                cargarVerificaciones(json.id_trailer);
             }
         } catch (error) {
             console.error('Error al guardar el tráiler:', error);
@@ -613,6 +701,98 @@
         } catch (error) {
             console.error('Error al eliminar documento:', error);
             showAlert('Error de conexión al eliminar el documento.', 'error');
+        }
+    }
+
+    // ───────────────────────── VERIFICACIONES ─────────────────────────
+    const CAMPOS_VERIFICACION = [
+        'v_folioDictamen', 'v_fechaVerificacion', 'v_fechaVigencia', 'v_resultado',
+        'v_tipoServicio', 'v_odometro', 'v_sePresento', 'v_fechaAnterior',
+        'v_noAprobacion', 'v_noAcreditacion', 'v_tecnico',
+    ];
+
+    async function cargarVerificaciones(idTrailer) {
+        const tbody = document.getElementById('tablaVerificaciones');
+        try {
+            const res = await fetch(`/api/trailers/${idTrailer}/verificaciones`);
+            const json = await res.json();
+
+            if (!json.success || json.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center hint">Sin verificaciones.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            // El primero es el más reciente: es el que manda para vencimientos.
+            json.data.forEach((v, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-family:var(--mono);">${escapeHtml(v.FOLIO_DICTAMEN || '—')}${i === 0 ? '<span class="hint" style="display:block;color:var(--ok);">(vigente)</span>' : ''}</td>
+                    <td>${formatoFecha(v.FECHA_VERIFICACION)}</td>
+                    <td>${formatoFecha(v.FECHA_VIGENCIA)}</td>
+                    <td>${v.RESULTADO ? `<span class="badge ${v.RESULTADO === 'APROBADO' ? 'badge-ok' : 'badge-bad'}">${escapeHtml(v.RESULTADO)}</span>` : '—'}</td>
+                    <td>${v.ODOMETRO ? Number(v.ODOMETRO).toLocaleString('es-MX') : '—'}</td>
+                    <td class="text-center">
+                        <button class="ghost" title="Eliminar" onclick="eliminarVerificacion(${v.ID_VERIFICACION})">🗑️</button>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
+        } catch (error) {
+            console.error('Error al cargar verificaciones:', error);
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color:var(--bad);">No se pudieron cargar las verificaciones.</td></tr>';
+        }
+    }
+
+    async function agregarVerificacion() {
+        const idTrailer = document.getElementById('edit_id').value;
+        if (!idTrailer) return showAlert('Guarda primero el tráiler.', 'info');
+
+        const fechaVerificacion = document.getElementById('v_fechaVerificacion').value;
+        if (!fechaVerificacion) return showAlert('Captura la fecha de verificación.', 'info');
+
+        const datos = {
+            folioDictamen: document.getElementById('v_folioDictamen').value,
+            fechaVerificacion,
+            fechaVigencia: document.getElementById('v_fechaVigencia').value || null,
+            resultado: document.getElementById('v_resultado').value,
+            tipoServicio: document.getElementById('v_tipoServicio').value,
+            odometro: document.getElementById('v_odometro').value || null,
+            sePresento: document.getElementById('v_sePresento').value,
+            fechaVerificacionAnterior: document.getElementById('v_fechaAnterior').value || null,
+            noAprobacion: document.getElementById('v_noAprobacion').value,
+            noAcreditacion: document.getElementById('v_noAcreditacion').value,
+            tecnicoNombre: document.getElementById('v_tecnico').value,
+        };
+
+        try {
+            const res = await fetch(`/api/trailers/${idTrailer}/verificaciones`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(datos),
+            });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) {
+                CAMPOS_VERIFICACION.forEach(id => { document.getElementById(id).value = ''; });
+                cargarVerificaciones(idTrailer);
+            }
+        } catch (error) {
+            console.error('Error al registrar la verificación:', error);
+            showAlert('Error de conexión al registrar la verificación.', 'error');
+        }
+    }
+
+    async function eliminarVerificacion(id) {
+        const ok = await showConfirm('¿Eliminar esta verificación?', { type: 'danger', title: 'Eliminar verificación' });
+        if (!ok) return;
+        try {
+            const res = await fetch(`/api/trailers/verificaciones/${id}`, { method: 'DELETE' });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) cargarVerificaciones(document.getElementById('edit_id').value);
+        } catch (error) {
+            console.error('Error al eliminar la verificación:', error);
+            showAlert('Error de conexión.', 'error');
         }
     }
 

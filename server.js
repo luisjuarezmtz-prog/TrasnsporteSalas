@@ -42,6 +42,7 @@ app.use('/api', require('./routes/trailers'));
 app.use('/api', require('./routes/trailerChecks'));
 app.use('/api', require('./routes/trailerSeguros'));
 app.use('/api', require('./routes/mantenimientos'));
+app.use('/api', require('./routes/vencimientos'));
 app.use('/api', require('./routes/checks').router);
 
 // Ruta heredada que el frontend original llama sin el prefijo /api

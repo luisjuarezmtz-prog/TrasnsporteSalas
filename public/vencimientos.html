@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <script src="js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vencimientos - Transportes Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/ui-alert.js"></script>
+</head>
+<body>
+
+<div class="brand">
+    <h1>⏰ Control de Vencimientos</h1>
+    <a href="dashboard.html" class="link-plain tag">← Volver a menu principal</a>
+</div>
+<p class="hint" style="margin-top:-14px;margin-bottom:20px;">
+    Cruza en vivo las fechas de tarjetas de circulación, verificaciones, pólizas, pagos de póliza y trámites de gestoría.
+</p>
+
+<div class="grid grid-3" style="margin-bottom:20px;">
+    <div class="stat-card"><div class="stat-label">🔴 Vencidos</div><div id="kpiVencidos" class="stat-value bad">—</div></div>
+    <div class="stat-card"><div class="stat-label">🟡 Por vencer</div><div id="kpiPorVencer" class="stat-value amber">—</div></div>
+    <div class="stat-card"><div class="stat-label">🟢 Vigentes</div><div id="kpiVigentes" class="stat-value ok">—</div></div>
+</div>
+
+<div class="panel">
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr auto auto;gap:12px;align-items:end;margin-bottom:18px;">
+        <div class="field">
+            <label>Avisar con</label>
+            <select id="diasAviso">
+                <option value="15">15 días de anticipación</option>
+                <option value="30" selected>30 días de anticipación</option>
+                <option value="60">60 días de anticipación</option>
+                <option value="90">90 días de anticipación</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Estado</label>
+            <select id="filtroEstado">
+                <option value="pendientes" selected>Vencidos y por vencer</option>
+                <option value="VENCIDO">Solo vencidos</option>
+                <option value="POR_VENCER">Solo por vencer</option>
+                <option value="todos">Todos</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Tipo</label>
+            <select id="filtroTipo"><option value="">Todos</option></select>
+        </div>
+        <button class="primary" onclick="cargar()">🔄 Actualizar</button>
+        <button class="ghost" onclick="enviarCorreo()">📧 Enviar aviso</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Estado</th>
+                <th>Tipo</th>
+                <th>Unidad</th>
+                <th>Detalle</th>
+                <th>Fecha</th>
+                <th>Faltan</th>
+                <th class="text-right">Monto</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            <tr><td colspan="7" class="text-center hint">Cargando...</td></tr>
+        </tbody>
+    </table>
+    <p class="hint" id="contador" style="margin-top:10px;"></p>
+</div>
+
+<script>
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+    const formatMoney = (v) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v || 0);
+
+    function formatoFecha(iso) {
+        const [a, m, d] = String(iso).slice(0, 10).split('-');
+        return `${d}/${m}/${a}`;
+    }
+
+    const SEMAFORO = {
+        VENCIDO:    ['badge-bad', '🔴 Vencido'],
+        POR_VENCER: ['badge-warn', '🟡 Por vencer'],
+        VIGENTE:    ['badge-ok', '🟢 Vigente'],
+    };
+
+    function textoDias(dias) {
+        if (dias < 0) return `hace ${Math.abs(dias)} día(s)`;
+        if (dias === 0) return 'HOY';
+        return `${dias} día(s)`;
+    }
+
+    let datosActuales = [];
+
+    async function cargar() {
+        const tbody = document.getElementById('tablaCuerpo');
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center hint">Cargando...</td></tr>';
+
+        const dias = document.getElementById('diasAviso').value;
+
+        try {
+            // Siempre se piden todos para que los KPIs cuenten completo;
+            // el filtro de estado se aplica del lado del cliente.
+            const res = await fetch(`/api/vencimientos?dias=${dias}`);
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message);
+
+            datosActuales = json.items;
+
+            document.getElementById('kpiVencidos').textContent = json.resumen.vencidos;
+            document.getElementById('kpiPorVencer').textContent = json.resumen.porVencer;
+            document.getElementById('kpiVigentes').textContent = json.resumen.vigentes;
+
+            llenarTipos();
+            pintar();
+        } catch (error) {
+            console.error('Error al cargar vencimientos:', error);
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="color:var(--bad);">Error al conectar con el servidor.</td></tr>';
+        }
+    }
+
+    function llenarTipos() {
+        const sel = document.getElementById('filtroTipo');
+        const actual = sel.value;
+        const tipos = [...new Set(datosActuales.map(i => i.tipo))].sort();
+        sel.innerHTML = '<option value="">Todos</option>';
+        tipos.forEach(t => sel.appendChild(new Option(t, t)));
+        sel.value = tipos.includes(actual) ? actual : '';
+    }
+
+    function pintar() {
+        const tbody = document.getElementById('tablaCuerpo');
+        const estado = document.getElementById('filtroEstado').value;
+        const tipo = document.getElementById('filtroTipo').value;
+
+        const filas = datosActuales.filter(i => {
+            if (tipo && i.tipo !== tipo) return false;
+            if (estado === 'pendientes') return i.estado !== 'VIGENTE';
+            if (estado === 'todos') return true;
+            return i.estado === estado;
+        });
+
+        if (filas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center hint">Sin pendientes con este filtro. 👌</td></tr>';
+            document.getElementById('contador').textContent = '';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        filas.forEach(i => {
+            const [clase, texto] = SEMAFORO[i.estado];
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span class="badge ${clase}">${texto}</span></td>
+                <td>${escapeHtml(i.tipo)}</td>
+                <td style="font-family:var(--mono);">${escapeHtml(i.unidad)}</td>
+                <td>${escapeHtml(i.descripcion)}</td>
+                <td>${formatoFecha(i.fecha)}</td>
+                <td style="${i.estado === 'VENCIDO' ? 'color:var(--bad);font-weight:700;' : ''}">${textoDias(i.diasRestantes)}</td>
+                <td class="text-right">${i.monto !== undefined ? formatMoney(i.monto) : '—'}</td>`;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('contador').textContent = `Mostrando ${filas.length} de ${datosActuales.length} registros`;
+    }
+
+    async function enviarCorreo() {
+        const ok = await showConfirm(
+            '¿Enviar ahora el aviso de vencimientos a la cuenta de notificaciones del sistema?',
+            { title: 'Enviar aviso', confirmText: 'Enviar' }
+        );
+        if (!ok) return;
+
+        try {
+            const res = await fetch('/api/vencimientos/enviar-correo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dias: document.getElementById('diasAviso').value }),
+            });
+            const json = await res.json();
+            showAlert(json.message, json.success ? (json.enviado ? 'success' : 'info') : 'error');
+        } catch (error) {
+            console.error('Error al enviar el aviso:', error);
+            showAlert('Error de conexión al enviar el aviso.', 'error');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('diasAviso').addEventListener('change', cargar);
+        document.getElementById('filtroEstado').addEventListener('change', pintar);
+        document.getElementById('filtroTipo').addEventListener('change', pintar);
+        cargar();
+    });
+</script>
+
+</body>
+</html>

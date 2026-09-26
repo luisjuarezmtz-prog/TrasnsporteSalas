@@ -152,6 +152,22 @@
                 <div class="field">
                     <textarea id="observaciones" rows="3"></textarea>
                 </div>
+
+                <!-- Los documentos se suben contra el ID de la póliza, así
+                     que esta sección se habilita al guardarla. -->
+                <h6 class="seccion">Póliza digitalizada</h6>
+                <p class="hint" id="avisoDocumentos" style="margin:0 0 12px;">Guarda primero la póliza para poder subir el documento escaneado.</p>
+                <div class="grid" style="grid-template-columns:1fr auto;gap:12px;align-items:end;margin-bottom:12px;">
+                    <div class="field">
+                        <label>Póliza escaneada o anexos (PDF, JPG o PNG)</label>
+                        <input type="file" id="inputDocumento" accept="application/pdf,image/png,image/jpeg">
+                    </div>
+                    <button type="button" class="ghost" id="btnSubirDocumento" onclick="subirDocumento()">➕ Agregar</button>
+                </div>
+                <table>
+                    <thead><tr><th>Archivo</th><th>Fecha</th><th class="text-center">Acciones</th></tr></thead>
+                    <tbody id="tablaDocumentos"><tr><td colspan="3" class="text-center hint">Sin documentos.</td></tr></tbody>
+                </table>
             </div>
             <div class="modal-footer">
                 <button type="button" class="ghost" data-bs-dismiss="modal">Cerrar</button>
@@ -368,6 +384,64 @@
         }
     }
 
+    // ───────────────────────── PÓLIZA DIGITALIZADA ─────────────────────────
+    function habilitarDocumentos(habilitado) {
+        document.getElementById('inputDocumento').disabled = !habilitado;
+        document.getElementById('btnSubirDocumento').disabled = !habilitado;
+        document.getElementById('avisoDocumentos').hidden = habilitado;
+    }
+
+    function pintarDocumentos(documentos) {
+        const tbody = document.getElementById('tablaDocumentos');
+        if (!documentos || documentos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center hint">Sin documentos.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = '';
+        documentos.forEach(d => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><a href="${escapeHtml(d.FILE_PATH)}" target="_blank" rel="noopener">${escapeHtml(d.FILE_NAME)}</a></td>
+                <td>${formatoFecha(d.UPLOAD_DATE)}</td>
+                <td class="text-center"><button class="ghost" title="Eliminar" onclick="eliminarDocumento(${d.ID_DOCUMENTO})">🗑️</button></td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function subirDocumento() {
+        const id = document.getElementById('edit_id').value;
+        const input = document.getElementById('inputDocumento');
+        if (!id) return showAlert('Guarda primero la póliza.', 'info');
+        if (!input.files[0]) return showAlert('Selecciona un archivo.', 'info');
+
+        const formData = new FormData();
+        formData.append('documento', input.files[0]);
+
+        try {
+            const res = await fetch(`/api/trailer-seguros/${id}/documentos`, { method: 'POST', body: formData });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) { input.value = ''; abrirModalEdicion(id); }
+        } catch (error) {
+            console.error('Error al subir el documento:', error);
+            showAlert('Error de conexión al subir el documento.', 'error');
+        }
+    }
+
+    async function eliminarDocumento(idDocumento) {
+        const ok = await showConfirm('¿Eliminar este documento?', { type: 'danger', title: 'Eliminar documento' });
+        if (!ok) return;
+        try {
+            const res = await fetch(`/api/trailer-seguros/documentos/${idDocumento}`, { method: 'DELETE' });
+            const json = await res.json();
+            showAlert(json.message, json.success ? 'success' : 'error');
+            if (json.success) abrirModalEdicion(document.getElementById('edit_id').value);
+        } catch (error) {
+            console.error('Error al eliminar el documento:', error);
+            showAlert('Error de conexión.', 'error');
+        }
+    }
+
     // ───────────────────────── ALTA / CAMBIO ─────────────────────────
     function limpiarFormulario() {
         document.getElementById('edit_id').value = '';
@@ -379,6 +453,8 @@
         document.getElementById('primerPago').value = 0;
         pagosActuales = [];
         pintarPlan();
+        pintarDocumentos([]);
+        habilitarDocumentos(false);
     }
 
     function abrirModalAlta() {
@@ -417,6 +493,8 @@
                 pagado: Number(p.PAGADO),
             }));
             pintarPlan();
+            pintarDocumentos(s.documentos || []);
+            habilitarDocumentos(true);
 
             modalSeguro.show();
         } catch (error) {

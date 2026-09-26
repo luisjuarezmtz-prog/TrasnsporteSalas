@@ -254,4 +254,80 @@ router.delete('/trailers/documentos/:idDocumento', async (req, res) => {
   }
 });
 
+// --- VERIFICACIONES FÍSICO-MECÁNICAS (NOM-068-SCT-2-2014) ---
+// El dictamen es periódico y el propio documento registra la fecha de
+// la verificación anterior, así que se conserva el histórico completo:
+// el panel de vencimientos solo mira la más reciente de cada unidad.
+router.get('/trailers/:id/verificaciones', async (req, res) => {
+  try {
+    const [rows] = await dbPromesa.query(
+      `SELECT ID_VERIFICACION, FOLIO_DICTAMEN, NO_APROBACION, NO_ACREDITACION, RESULTADO,
+              TIPO_SERVICIO, FECHA_VERIFICACION, FECHA_VERIFICACION_ANTERIOR, FECHA_VIGENCIA,
+              ODOMETRO, SE_PRESENTO, TECNICO_NOMBRE, OBSERVACIONES
+         FROM trailer_verificaciones
+        WHERE ID_TRAILER = ?
+        ORDER BY FECHA_VERIFICACION DESC, ID_VERIFICACION DESC`,
+      [req.params.id]
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error al consultar verificaciones:', error);
+    res.status(500).json({ success: false, message: 'Error al consultar las verificaciones.' });
+  }
+});
+
+router.post('/trailers/:id/verificaciones', async (req, res) => {
+  const b = req.body;
+  if (!b.fechaVerificacion) {
+    return res.status(400).json({ success: false, message: 'La fecha de verificación es obligatoria.' });
+  }
+
+  try {
+    const [resultado] = await dbPromesa.query(
+      `INSERT INTO trailer_verificaciones
+         (ID_TRAILER, FOLIO_DICTAMEN, NO_APROBACION, NO_ACREDITACION, RESULTADO, TIPO_SERVICIO,
+          FECHA_VERIFICACION, HORA_INICIO, HORA_FINAL, FECHA_VERIFICACION_ANTERIOR, FECHA_VIGENCIA,
+          ODOMETRO, SE_PRESENTO, TECNICO_NOMBRE, OBSERVACIONES)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.params.id,
+        (b.folioDictamen || '').trim() || null,
+        (b.noAprobacion || '').trim() || null,
+        (b.noAcreditacion || '').trim() || null,
+        (b.resultado || '').trim() || null,
+        (b.tipoServicio || '').trim() || null,
+        b.fechaVerificacion,
+        b.horaInicio || null,
+        b.horaFinal || null,
+        b.fechaVerificacionAnterior || null,
+        b.fechaVigencia || null,
+        b.odometro || null,
+        (b.sePresento || '').trim() || null,
+        (b.tecnicoNombre || '').trim() || null,
+        (b.observaciones || '').trim() || null,
+      ]
+    );
+    res.json({ success: true, message: 'Verificación registrada.', id_verificacion: resultado.insertId });
+  } catch (error) {
+    console.error('Error al registrar la verificación:', error);
+    res.status(500).json({ success: false, message: 'Error al registrar la verificación.' });
+  }
+});
+
+router.delete('/trailers/verificaciones/:idVerificacion', async (req, res) => {
+  try {
+    const [resultado] = await dbPromesa.query(
+      'DELETE FROM trailer_verificaciones WHERE ID_VERIFICACION = ?',
+      [req.params.idVerificacion]
+    );
+    if (resultado.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Verificación no encontrada.' });
+    }
+    res.json({ success: true, message: 'Verificación eliminada.' });
+  } catch (error) {
+    console.error('Error al eliminar la verificación:', error);
+    res.status(500).json({ success: false, message: 'Error al eliminar la verificación.' });
+  }
+});
+
 module.exports = router;

@@ -11,8 +11,31 @@
 
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
 const { dbPromesa } = require('../config/db');
 const { calcularPlanPagos } = require('../utils/amortizacionSeguro');
+const { UPLOADS_DIR } = require('./checks');
+
+// ── Póliza digitalizada y sus anexos ───────────────────────────────────
+const DOCS_DIR = path.join(UPLOADS_DIR, 'seguros');
+if (!fs.existsSync(DOCS_DIR)) fs.mkdirSync(DOCS_DIR, { recursive: true });
+
+const uploadDocumento = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, DOCS_DIR),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `poliza-${req.params.id}-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) =>
+    ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'].includes(file.mimetype)
+      ? cb(null, true)
+      : cb(new Error('Solo se acepta PDF, JPG o PNG')),
+});
 
 // --- CATÁLOGOS DEL FORMULARIO ---
 // El requisito es que exista proveedor, no que ya esté autorizado, así
@@ -248,7 +271,12 @@ router.get('/trailer-seguros/:id', async (req, res) => {
       [req.params.id]
     );
 
-    res.json({ success: true, data: { ...seguro, pagos } });
+    const [documentos] = await dbPromesa.query(
+      'SELECT ID_DOCUMENTO, FILE_PATH, FILE_NAME, UPLOAD_DATE FROM trailer_seguro_documentos WHERE ID_SEGURO = ? ORDER BY UPLOAD_DATE DESC',
+      [req.params.id]
+    );
+
+    res.json({ success: true, data: { ...seguro, pagos, documentos } });
   } catch (err) {
     console.error('Error al consultar el seguro:', err);
     res.status(500).json({ success: false, message: 'Error al consultar el seguro.' });
@@ -296,6 +324,40 @@ router.put('/trailer-seguros/:id/estatus', async (req, res) => {
   } catch (err) {
     console.error('Error al cambiar el estatus del seguro:', err);
     res.status(500).json({ success: false, message: 'Error al cambiar el estatus.' });
+  }
+});
+
+// --- PÓLIZA DIGITALIZADA Y ANEXOS ---
+router.post('/trailer-seguros/:id/documentos', uploadDocumento.single('documento'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: 'No se recibió ningún archivo.' });
+
+  try {
+    const [resultado] = await dbPromesa.query(
+      'INSERT INTO trailer_seguro_documentos (ID_SEGURO, FILE_PATH, FILE_NAME) VALUES (?, ?, ?)',
+      [req.params.id, `/uploads/seguros/${req.file.filename}`, req.file.originalname]
+    );
+    res.json({ success: true, message: 'Documento agregado.', id_documento: resultado.insertId });
+  } catch (err) {
+    console.error('Error al guardar el documento de la póliza:', err);
+    res.status(500).json({ success: false, message: 'Error al guardar el documento.' });
+  }
+});
+
+router.delete('/trailer-seguros/documentos/:idDocumento', async (req, res) => {
+  try {
+    const [rows] = await dbPromesa.query(
+      'SELECT FILE_PATH FROM trailer_seguro_documentos WHERE ID_DOCUMENTO = ?',
+      [req.params.idDocumento]
+    );
+    if (rows.length === 0) return res.json({ success: false, message: 'Documento no encontrado.' });
+
+    await dbPromesa.query('DELETE FROM trailer_seguro_documentos WHERE ID_DOCUMENTO = ?', [req.params.idDocumento]);
+    fs.unlink(path.join(UPLOADS_DIR, rows[0].FILE_PATH.replace(/^\/uploads\//, '')), () => {});
+
+    res.json({ success: true, message: 'Documento eliminado.' });
+  } catch (err) {
+    console.error('Error al eliminar el documento de la póliza:', err);
+    res.status(500).json({ success: false, message: 'Error al eliminar el documento.' });
   }
 });
 
