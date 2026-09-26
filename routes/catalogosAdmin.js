@@ -102,6 +102,31 @@ const CATALOGOS = {
     nombreColumna: 'GENDER_NAME',
     campos: [],
   },
+  tipos_documento_trailer: {
+    label: 'Tipos de Documento (Tráiler)',
+    tabla: 'c_document_types_trailer',
+    idColumna: 'ID_DOCUMENT_TYPE',
+    nombreColumna: 'DOCUMENT_TYPE_NAME',
+    campos: [],
+  },
+  tipos_mantenimiento: {
+    label: 'Conceptos de Mantenimiento y Gestoría',
+    tabla: 'c_tipos_mantenimiento',
+    idColumna: 'ID_TIPO',
+    nombreColumna: 'NOMBRE',
+    // A diferencia del resto, aquí el select guarda texto y no un id
+    // numérico: la columna TIPO es la que separa los conceptos de taller
+    // de los trámites en el formulario de Mantenimientos.
+    campos: [
+      {
+        columna: 'TIPO', label: 'Clasificación', tipo: 'select_texto',
+        opciones: [
+          { value: 'MANTENIMIENTO', label: 'Mantenimiento' },
+          { value: 'GESTORIA', label: 'Gestoría' },
+        ],
+      },
+    ],
+  },
 };
 
 function obtenerCatalogo(tipo, res) {
@@ -122,9 +147,20 @@ function extraerValoresCampos(cat, valores) {
   valores = valores || {};
   return cat.campos.map(campo => {
     const crudo = valores[campo.columna];
+    // 'select' guarda el id numérico de la opción; 'select_texto' guarda
+    // la cadena tal cual (p. ej. TIPO = 'MANTENIMIENTO'), que pasarla por
+    // parseFloat la volvería 0.
     if (campo.tipo === 'number' || campo.tipo === 'select') {
       const num = parseFloat(crudo);
       return isNaN(num) ? 0 : num;
+    }
+    if (campo.tipo === 'select_texto') {
+      const permitidas = (campo.opciones || []).map(o => String(o.value));
+      const valor = String(crudo ?? '');
+      // Si llega algo que no está en el catálogo se usa la primera
+      // opción, para no guardar basura en una columna que el resto del
+      // sistema filtra.
+      return permitidas.includes(valor) ? valor : permitidas[0];
     }
     return (crudo ?? '').toString();
   });

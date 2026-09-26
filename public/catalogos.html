@@ -115,7 +115,7 @@
     // Convierte el valor crudo de un campo (número o clave de un select) en
     // el texto legible que se muestra en la tabla (p. ej. ID_TYPE_TRIP=1 -> "Local").
     function textoCampo(campo, valor) {
-        if (campo.tipo === 'select') {
+        if (campo.tipo === 'select' || campo.tipo === 'select_texto') {
             const opcion = (campo.opciones || []).find(o => String(o.value) === String(valor));
             return opcion ? opcion.label : (valor ?? '—');
         }
@@ -125,7 +125,7 @@
     // Genera el <input>/<select> para un campo extra, con un valor inicial opcional.
     function inputCampo(campo, idSufijo, valorInicial) {
         const idInput = `campo-${campo.columna}-${idSufijo}`;
-        if (campo.tipo === 'select') {
+        if (campo.tipo === 'select' || campo.tipo === 'select_texto') {
             const opciones = (campo.opciones || []).map(o =>
                 `<option value="${o.value}" ${String(o.value) === String(valorInicial) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`
             ).join('');
