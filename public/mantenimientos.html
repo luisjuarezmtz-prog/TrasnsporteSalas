@@ -156,6 +156,19 @@
                     </div>
                 </div>
 
+                <div class="grid" style="grid-template-columns:1fr auto 1fr;gap:12px;align-items:start;margin-bottom:10px;">
+                    <div class="field">
+                        <label>Fecha de pago</label>
+                        <input type="date" id="fechaPago">
+                        <p class="hint" style="margin:6px 0 0;">Cuándo se le pagó al proveedor. Se puede dejar vacía y registrarla después.</p>
+                    </div>
+                    <!-- En una orden ya autorizada el formulario se bloquea, así que
+                         el pago se guarda solo con este botón. -->
+                    <button type="button" class="ghost" id="btnRegistrarPago" style="margin-top:22px;" hidden
+                            onclick="registrarPago()">💵 Guardar pago</button>
+                    <div class="field"></div>
+                </div>
+
                 <div class="field" id="campoVencimiento" style="margin-bottom:14px;" hidden>
                     <label>Nueva fecha de vencimiento del documento</label>
                     <input type="date" id="fechaVencimientoNueva">
@@ -167,19 +180,21 @@
                     <textarea id="observaciones" rows="2"></textarea>
                 </div>
 
-                <!-- Solo aplica una vez que la orden existe -->
-                <div id="bloquePosterior" hidden>
-                    <h6 class="seccion">Puntos realizados</h6>
+                <h6 class="seccion">Puntos realizados</h6>
                     <p class="hint" style="margin:0 0 12px;">
-                        Captura renglón por renglón lo que se hizo. Es una lista abierta, no un
-                        checklist: el trabajo de taller varía demasiado para encasillarlo, y el
-                        <a href="comparativomantenimientos.html">comparativo</a> usa este texto para
-                        detectar cuándo se repite el mismo trabajo en una unidad.
+                        Ve agregando cada concepto que se realizó. El campo despliega los del catálogo
+                        según el tipo elegido, y también acepta uno escrito a mano si no está en la lista.
+                        El <a href="comparativomantenimientos.html">comparativo</a> usa este texto para
+                        detectar cuándo se repite el mismo trabajo en una unidad, así que conviene elegir
+                        del catálogo cuando exista.
                     </p>
                     <div class="grid" style="grid-template-columns:3fr 1fr 1fr 2fr auto;gap:12px;align-items:end;margin-bottom:12px;">
                         <div class="field">
                             <label>Punto realizado</label>
-                            <input type="text" id="puntoDescripcion" placeholder="Ej. Cambio de balatas eje trasero">
+                            <input type="text" id="puntoDescripcion" list="listaConceptos"
+                                   placeholder="Elige del catálogo o escribe uno nuevo"
+                                   autocomplete="off">
+                            <datalist id="listaConceptos"></datalist>
                         </div>
                         <div class="field">
                             <label>Cantidad</label>
@@ -216,15 +231,8 @@
                         </tfoot>
                     </table>
 
-                    <h6 class="seccion">Pago</h6>
-                    <div class="grid" style="grid-template-columns:1fr auto auto;gap:12px;align-items:end;margin-bottom:8px;">
-                        <div class="field">
-                            <label>Fecha de pago</label>
-                            <input type="date" id="fechaPago">
-                        </div>
-                        <button type="button" class="ghost" onclick="registrarPago()">💵 Registrar pago</button>
-                        <button type="button" class="ghost" onclick="quitarPago()">Quitar</button>
-                    </div>
+                <!-- Solo aplica una vez que la orden existe -->
+                <div id="bloquePosterior" hidden>
                     <p class="hint" id="avisoPago" style="margin:0 0 14px;"></p>
 
                     <h6 class="seccion">Comprobantes</h6>
@@ -343,6 +351,9 @@
     let modalOrden, modalConcluir;
     let catalogos = { tipos: [], proveedores: [], trailers: [] };
     let ordenActual = null;
+    // Puntos capturados en un alta, mientras la orden todavía no existe
+    // y no hay id contra el cual guardarlos. Se mandan junto con el POST.
+    let puntosPendientes = [];
 
     // ───────────────────────── CATÁLOGOS ─────────────────────────
     async function cargarCatalogos() {
@@ -368,6 +379,19 @@
         sel.innerHTML = '';
         catalogos.tipos.filter(t => t.TIPO === tipo).forEach(t => sel.appendChild(new Option(t.NOMBRE, t.ID_TIPO)));
         document.getElementById('campoVencimiento').hidden = tipo !== 'GESTORIA';
+
+        // El desplegable de puntos ofrece los conceptos del mismo tipo:
+        // elegirlos del catálogo mantiene el texto uniforme, que es de lo
+        // que depende el comparativo para detectar trabajo repetido.
+        const lista = document.getElementById('listaConceptos');
+        lista.innerHTML = '';
+        catalogos.tipos
+            .filter(t => t.TIPO === tipo)
+            .forEach(t => {
+                const op = document.createElement('option');
+                op.value = t.NOMBRE;
+                lista.appendChild(op);
+            });
     }
 
     function cambiarTipoUnidad() {
@@ -460,6 +484,7 @@
     // ───────────────────────── ALTA / CAMBIO ─────────────────────────
     function limpiarFormulario() {
         ordenActual = null;
+        puntosPendientes = [];
         document.getElementById('edit_id').value = '';
         ['unidadPlacas', 'descripcion', 'fechaProgramada', 'odometro', 'observaciones', 'fechaVencimientoNueva']
             .forEach(id => { document.getElementById(id).value = ''; });
@@ -469,9 +494,12 @@
         document.getElementById('idProveedor').value = '';
         document.getElementById('montoEstimado').value = 0;
         document.getElementById('fechaSolicitud').value = new Date().toISOString().split('T')[0];
+        document.getElementById('fechaPago').value = '';
+        pintarPuntos([]);
         document.getElementById('bandaEstatus').innerHTML = '';
         document.getElementById('accionesFlujo').innerHTML = '';
         document.getElementById('bloquePosterior').hidden = true;
+        document.getElementById('btnRegistrarPago').hidden = true;
         document.getElementById('btnGuardar').hidden = false;
         filtrarConceptos();
         cambiarTipoUnidad();
@@ -533,10 +561,12 @@
 
             pintarAccionesFlujo(m.ESTATUS);
             document.getElementById('bloquePosterior').hidden = false;
+            document.getElementById('btnRegistrarPago').hidden = false;
             document.getElementById('fechaPago').value = aValorDeInput(m.FECHA_PAGO);
             document.getElementById('avisoPago').innerHTML = m.FECHA_PAGO
                 ? `Pagada el <b>${formatoFecha(m.FECHA_PAGO)}</b>. Sube el comprobante de pago con el tipo correspondiente.`
                 : 'Concluir y pagar son momentos distintos: se puede entregar el trabajo un día y liquidarlo otro.';
+            puntosPendientes = [];
             pintarPuntos(m.puntos || []);
             pintarDocumentos(m.documentos || []);
 
@@ -575,6 +605,8 @@
             montoEstimado: document.getElementById('montoEstimado').value || 0,
             fechaVencimientoNueva: document.getElementById('fechaVencimientoNueva').value || null,
             observaciones: document.getElementById('observaciones').value,
+            fechaPago: document.getElementById('fechaPago').value || null,
+            puntos: puntosPendientes,
             usuario: localStorage.getItem('username') || 'Sistema',
         };
     }
@@ -680,7 +712,7 @@
                 <td class="text-right">${Number(p.CANTIDAD)}</td>
                 <td class="text-right">${p.COSTO !== null && p.COSTO !== undefined ? formatMoney(p.COSTO) : '—'}</td>
                 <td>${escapeHtml(p.OBSERVACIONES || '')}</td>
-                <td class="text-center"><button class="ghost" title="Eliminar" onclick="eliminarPunto(${p.ID_DETALLE})">🗑️</button></td>`;
+                <td class="text-center"><button class="ghost" title="Eliminar" onclick="${p.ID_DETALLE ? `eliminarPunto(${p.ID_DETALLE})` : `eliminarPuntoPendiente(${p.INDICE})`}">🗑️</button></td>`;
             tbody.appendChild(tr);
         });
 
@@ -689,35 +721,68 @@
         total.textContent = hayCostos ? formatMoney(suma) : '—';
     }
 
+    function limpiarCamposPunto() {
+        ['puntoDescripcion', 'puntoCosto', 'puntoObservaciones'].forEach(x => { document.getElementById(x).value = ''; });
+        document.getElementById('puntoCantidad').value = 1;
+        document.getElementById('puntoDescripcion').focus();
+    }
+
     async function agregarPunto() {
         const id = document.getElementById('edit_id').value;
         const descripcion = document.getElementById('puntoDescripcion').value.trim();
-        if (!id) return showAlert('Guarda primero la orden.', 'info');
         if (!descripcion) return showAlert('Captura el punto realizado.', 'info');
+
+        const punto = {
+            descripcion,
+            cantidad: document.getElementById('puntoCantidad').value || 1,
+            costo: document.getElementById('puntoCosto').value,
+            observaciones: document.getElementById('puntoObservaciones').value,
+        };
+
+        // Alta: la orden no existe, así que el punto espera en memoria y
+        // viaja con el POST al guardar.
+        if (!id) {
+            puntosPendientes.push(punto);
+            pintarPuntos(puntosPendientes.map((p, i) => ({
+                ID_DETALLE: null,
+                INDICE: i,
+                DESCRIPCION: p.descripcion,
+                CANTIDAD: p.cantidad,
+                COSTO: p.costo === '' ? null : p.costo,
+                OBSERVACIONES: p.observaciones,
+            })));
+            limpiarCamposPunto();
+            return;
+        }
 
         try {
             const res = await fetch(`/api/mantenimientos/${id}/detalle`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    descripcion,
-                    cantidad: document.getElementById('puntoCantidad').value || 1,
-                    costo: document.getElementById('puntoCosto').value,
-                    observaciones: document.getElementById('puntoObservaciones').value,
-                }),
+                body: JSON.stringify(punto),
             });
             const json = await res.json();
             if (!json.success) return showAlert(json.message, 'error');
 
-            ['puntoDescripcion', 'puntoCosto', 'puntoObservaciones'].forEach(x => { document.getElementById(x).value = ''; });
-            document.getElementById('puntoCantidad').value = 1;
-            document.getElementById('puntoDescripcion').focus();
+            limpiarCamposPunto();
             abrirModalEdicion(id);
             cargarLista();
         } catch (error) {
             console.error('Error al agregar el punto:', error);
             showAlert('Error de conexión al agregar el punto.', 'error');
         }
+    }
+
+    async function eliminarPuntoPendiente(indice) {
+        puntosPendientes.splice(indice, 1);
+        pintarPuntos(puntosPendientes.map((p, i) => ({
+            ID_DETALLE: null,
+            INDICE: i,
+            DESCRIPCION: p.descripcion,
+            CANTIDAD: p.cantidad,
+            COSTO: p.costo === '' ? null : p.costo,
+            OBSERVACIONES: p.observaciones,
+        })));
     }
 
     async function eliminarPunto(idDetalle) {
@@ -738,6 +803,13 @@
     }
 
     // ───────────────────────── PAGO ─────────────────────────
+    function registrarPago() {
+        enviarPago(document.getElementById('fechaPago').value || null);
+    }
+
+    // Mientras la orden es editable la fecha de pago viaja en el PUT
+    // general. Una vez autorizada el formulario se bloquea, así que ahí
+    // se usa este endpoint dedicado desde el botón del pie.
     async function enviarPago(fechaPago) {
         const id = document.getElementById('edit_id').value;
         try {
@@ -755,16 +827,6 @@
         }
     }
 
-    function registrarPago() {
-        const fecha = document.getElementById('fechaPago').value;
-        if (!fecha) return showAlert('Captura la fecha de pago.', 'info');
-        enviarPago(fecha);
-    }
-
-    async function quitarPago() {
-        const ok = await showConfirm('¿Quitar la fecha de pago de esta orden?', { type: 'danger', title: 'Quitar pago' });
-        if (ok) enviarPago(null);
-    }
 
     // ───────────────────────── COMPROBANTES ─────────────────────────
     const ETIQUETA_DOCUMENTO = {

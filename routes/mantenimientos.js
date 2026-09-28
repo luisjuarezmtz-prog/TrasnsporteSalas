@@ -109,8 +109,34 @@ async function valoresComunes(body) {
     body.odometro || null,
     body.montoEstimado || 0,
     body.fechaVencimientoNueva || null,
+    body.fechaPago || null,
     (body.observaciones || '').trim() || null,
   ];
+}
+
+// Inserta los puntos que vengan junto con la orden. La pantalla los
+// puede capturar antes de guardar, así que llegan en el mismo POST en
+// vez de N llamadas sueltas.
+async function insertarPuntos(idMantenimiento, puntos) {
+  if (!Array.isArray(puntos) || puntos.length === 0) return;
+
+  const filas = puntos
+    .filter(p => p && String(p.descripcion || '').trim())
+    .map((p, i) => [
+      idMantenimiento,
+      i + 1,
+      String(p.descripcion).trim().slice(0, 255),
+      p.cantidad || 1,
+      p.costo === '' || p.costo === undefined || p.costo === null ? null : p.costo,
+      String(p.observaciones || '').trim().slice(0, 255) || null,
+    ]);
+  if (filas.length === 0) return;
+
+  await dbPromesa.query(
+    `INSERT INTO mantenimiento_detalle (ID_MANTENIMIENTO, ORDEN, DESCRIPCION, CANTIDAD, COSTO, OBSERVACIONES)
+     VALUES ?`,
+    [filas]
+  );
 }
 
 // --- COMPARATIVO DE SERVICIOS REPETIDOS ---
@@ -233,10 +259,13 @@ router.post('/mantenimientos', async (req, res) => {
       `INSERT INTO mantenimientos
          (TIPO, ID_TIPO, TIPO_UNIDAD, ID_TRAILER, UNIDAD_PLACAS, ID_PROVEEDOR, DESCRIPCION,
           FECHA_SOLICITUD, FECHA_PROGRAMADA, ODOMETRO, MONTO_ESTIMADO,
-          FECHA_VENCIMIENTO_NUEVA, OBSERVACIONES, USUARIO)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          FECHA_VENCIMIENTO_NUEVA, FECHA_PAGO, OBSERVACIONES, USUARIO)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [...(await valoresComunes(req.body)), (req.body.usuario || 'Sistema').slice(0, 30)]
     );
+
+    await insertarPuntos(resultado.insertId, req.body.puntos);
+
     res.json({
       success: true,
       message: 'Solicitud registrada. Queda pendiente de autorizar para generar la orden de compra.',
@@ -272,7 +301,8 @@ router.put('/mantenimientos/:id', async (req, res) => {
       `UPDATE mantenimientos
           SET TIPO = ?, ID_TIPO = ?, TIPO_UNIDAD = ?, ID_TRAILER = ?, UNIDAD_PLACAS = ?,
               ID_PROVEEDOR = ?, DESCRIPCION = ?, FECHA_SOLICITUD = ?, FECHA_PROGRAMADA = ?,
-              ODOMETRO = ?, MONTO_ESTIMADO = ?, FECHA_VENCIMIENTO_NUEVA = ?, OBSERVACIONES = ?
+              ODOMETRO = ?, MONTO_ESTIMADO = ?, FECHA_VENCIMIENTO_NUEVA = ?, FECHA_PAGO = ?,
+              OBSERVACIONES = ?
         WHERE ID_MANTENIMIENTO = ?`,
       [...(await valoresComunes(req.body)), req.params.id]
     );
@@ -382,11 +412,13 @@ router.put('/mantenimientos/:id/pago', async (req, res) => {
     );
     if (!actual) return res.status(404).json({ success: false, message: 'Registro no encontrado.' });
 
-    // Pagar algo que todavía no se autoriza no tiene sentido.
-    if (fechaPago && !['AUTORIZADA', 'EN_PROCESO', 'CONCLUIDA'].includes(actual.ESTATUS)) {
+    // Lo único sin sentido es pagar algo cancelado: hay talleres que
+    // cobran al momento y la orden se captura después, así que exigir
+    // que ya esté autorizada estorbaba más de lo que protegía.
+    if (fechaPago && actual.ESTATUS === 'CANCELADA') {
       return res.status(400).json({
         success: false,
-        message: `No se puede registrar el pago de una orden ${actual.ESTATUS.toLowerCase()}.`,
+        message: 'No se puede registrar el pago de una orden cancelada.',
       });
     }
 
